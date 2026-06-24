@@ -245,6 +245,12 @@ function App() {
           Syncing
         </div>
       )}
+      {syncError && (
+        <div className={`absolute right-3 ${syncing ? 'top-7' : 'top-1'} z-50 rounded px-2 py-0.5 text-xs text-red-300`}
+             style={{ backgroundColor: 'var(--bg-sidebar)' }}>
+          {syncError}
+        </div>
+      )}
 
       <HamburgerButton isOpen={sidebarOpen} onClick={toggleSidebar} />
 
