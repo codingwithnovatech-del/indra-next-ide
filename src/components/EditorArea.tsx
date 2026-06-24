@@ -40,7 +40,7 @@ const editorOptions = {
   smoothScrolling: true,
   cursorBlinking: 'smooth' as const,
   cursorSmoothCaretAnimation: 'on' as const,
-  multiCursorModifier: 'altCapsCtrl' as const,
+  multiCursorModifier: 'alt',
   multiCursorMergeOverlapping: true,
   folding: true,
   foldingHighlight: true,

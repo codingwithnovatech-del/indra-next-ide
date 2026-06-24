@@ -38,7 +38,7 @@ export function bundleHtml(content: string, flat: Map<string, FileNode>): string
   )
   result = result.replace(
     /<script\s+[^>]*src="([^"]+)"[^>]*>/gi,
-    (match, src) => {
+    (_match, src) => {
       const resolved = resolveFile(src, flat)
       if (resolved) return `<script>\n${resolved}\n</script>`
       return `<!-- Script not found: ${src} -->`
