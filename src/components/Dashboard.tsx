@@ -23,6 +23,15 @@ function Dashboard({ projects, loading, onCreateProject, onDeleteProject, onOpen
     setShowCreate(false)
   }
 
+  const handleDeleteClick = (id: string) => {
+    if (confirmDelete === id) {
+      onDeleteProject(id)
+      setConfirmDelete(null)
+      return
+    }
+    setConfirmDelete(id)
+  }
+
   return (
     <div className="flex min-h-screen flex-col" style={{ backgroundColor: 'var(--bg-app)', color: 'var(--text-primary)' }}>
       <header className="flex items-center justify-between px-6 h-[52px] border-b shrink-0"
@@ -111,7 +120,7 @@ function Dashboard({ projects, loading, onCreateProject, onDeleteProject, onOpen
                     </p>
                   </div>
                 </div>
-                <button onClick={(e) => { e.stopPropagation(); setConfirmDelete(p.id) }}
+                <button onClick={(e) => { e.stopPropagation(); handleDeleteClick(p.id) }}
                   className="px-3 py-1.5 rounded text-xs transition-colors"
                   style={{ color: 'var(--text-dim)' }}
                   onMouseEnter={(e) => e.currentTarget.style.color = '#f87171'}
