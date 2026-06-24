@@ -14,6 +14,7 @@ self.addEventListener('install', (event) => {
 })
 
 self.addEventListener('fetch', (event) => {
+  if (event.request.method !== 'GET' || !event.request.url.startsWith(self.location.origin)) return
   event.respondWith(
     caches.match(event.request).then((response) => {
       if (response) return response
@@ -23,8 +24,8 @@ self.addEventListener('fetch', (event) => {
           caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone))
         }
         return networkResponse
-      })
-    }),
+      }).catch(() => new Response('', { status: 503 }))
+    }).catch(() => fetch(event.request)),
   )
 })
 
