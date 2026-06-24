@@ -40,7 +40,7 @@ function getLanguage(filename: string): string {
 
 function App() {
   const { session, user, loading: authLoading, error: authError, message: authMessage, signUp, signIn, signOut, setError: setAuthError } = useAuth()
-  const { mode: themeMode, toggleTheme, setMode } = useTheme()
+  const { mode: themeMode, toggleTheme, setMode, isDark } = useTheme()
 
   const [screen, setScreen] = useState<Screen>('loading')
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(null)
@@ -51,7 +51,7 @@ function App() {
     setScreen('dashboard')
   }, [authLoading, session])
 
-  const { projects, loading: projectsLoading, createProject, deleteProject } = useCloudProjects(user)
+  const { projects, loading: projectsLoading, error: projectsError, createProject, deleteProject } = useCloudProjects(user)
   const { syncing, loadSnapshot, saveSnapshot } = useCloudSync()
 
   const handleOpenProject = useCallback(async (id: string) => {
@@ -250,6 +250,7 @@ function App() {
       <Dashboard
         projects={projects}
         loading={projectsLoading}
+        error={projectsError}
         onCreateProject={handleNewProjectThenOpen}
         onDeleteProject={deleteProject}
         onOpenProject={handleOpenProject}
@@ -295,7 +296,7 @@ function App() {
         )}
 
         <div className="flex flex-1 flex-col overflow-hidden">
-          {openFiles.length > 0 && (
+          {openFiles.length > 0 && !isMobile && (
             <TabBar
               tabs={openFiles}
               onSelect={handleSelectTab}
@@ -313,6 +314,7 @@ function App() {
               activeTab={activeTab}
               content={activeTab ? flat.get(activeTab.id)?.content ?? '' : ''}
               onChange={handleEditorChange}
+              isDark={isDark}
             />
 
             {previewOpen && !isMobile && (
@@ -329,6 +331,17 @@ function App() {
             )}
           </div>
         </div>
+
+        {openFiles.length > 0 && isMobile && (
+          <TabBar
+            tabs={openFiles}
+            onSelect={handleSelectTab}
+            onClose={handleCloseTab}
+            onRun={handleRun}
+            isPreviewOpen={previewOpen}
+            onTogglePreview={handleTogglePreview}
+          />
+        )}
       </div>
 
       {previewOpen && isMobile && (

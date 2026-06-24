@@ -4,6 +4,7 @@ import type { Project } from '../hooks/useCloudProjects'
 interface DashboardProps {
   projects: Project[]
   loading: boolean
+  error?: string | null
   onCreateProject: (name: string) => void
   onDeleteProject: (id: string) => void
   onOpenProject: (id: string) => void
@@ -11,7 +12,7 @@ interface DashboardProps {
   userName?: string
 }
 
-function Dashboard({ projects, loading, onCreateProject, onDeleteProject, onOpenProject, onSignOut, userName }: DashboardProps) {
+function Dashboard({ projects, loading, error, onCreateProject, onDeleteProject, onOpenProject, onSignOut, userName }: DashboardProps) {
   const [newName, setNewName] = useState('')
   const [showCreate, setShowCreate] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
@@ -44,6 +45,11 @@ function Dashboard({ projects, loading, onCreateProject, onDeleteProject, onOpen
       </header>
 
       <main className="flex-1 px-6 py-8 max-w-4xl mx-auto w-full">
+        {error && (
+          <div className="mb-4 text-xs p-3 rounded" style={{ backgroundColor: 'rgba(239,68,68,0.15)', color: '#f87171' }}>
+            {error}
+          </div>
+        )}
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-lg font-semibold">Projects</h2>
           <button onClick={() => setShowCreate(true)}

@@ -78,6 +78,7 @@ function FileTreeItem({
         className={`group flex cursor-pointer items-center gap-1 pr-2 text-sm transition-colors duration-75`}
         style={{
           paddingLeft: `${8 + depth * 16}px`,
+          minHeight: '28px',
           backgroundColor: isRenaming
             ? 'var(--bg-hover)'
             : isActive

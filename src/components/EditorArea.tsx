@@ -6,6 +6,7 @@ interface EditorAreaProps {
   activeTab: TabItem | undefined
   content: string
   onChange: (value: string | undefined) => void
+  isDark?: boolean
 }
 
 function getLanguage(filename: string): string {
@@ -26,9 +27,10 @@ function getLanguage(filename: string): string {
 }
 
 const editorOptions = {
-  minimap: { enabled: false },
+  minimap: { enabled: true, size: 'proportional' as const, maxColumn: 60, showSlider: 'mouseover' as const },
   fontSize: 13,
   fontFamily: "'Cascadia Code', 'Fira Code', 'JetBrains Mono', Consolas, monospace",
+  fontLigatures: true,
   lineNumbers: 'on' as const,
   wordWrap: 'on' as const,
   automaticLayout: true,
@@ -38,9 +40,25 @@ const editorOptions = {
   smoothScrolling: true,
   cursorBlinking: 'smooth' as const,
   cursorSmoothCaretAnimation: 'on' as const,
+  multiCursorModifier: 'altCapsCtrl' as const,
+  multiCursorMergeOverlapping: true,
+  folding: true,
+  foldingHighlight: true,
+  foldingStrategy: 'indentation' as const,
+  autoClosingBrackets: 'always' as const,
+  autoClosingQuotes: 'always' as const,
+  formatOnPaste: true,
+  linkedEditing: true,
+  codeLens: true,
+  colorDecorators: true,
+  selectionHighlight: true,
+  occurrenceHighlight: 'singleSel' as const,
+  renderLineHighlight: 'all' as const,
+  hideCursorInOverviewRuler: false,
+  overviewRulerLanes: 2,
 }
 
-function EditorArea({ activeTab, content, onChange }: EditorAreaProps) {
+function EditorArea({ activeTab, content, onChange, isDark = true }: EditorAreaProps) {
   const handleBeforeMount: BeforeMount = useCallback((monaco) => {
     monaco.editor.defineTheme('indra-dark', {
       base: 'vs-dark',
@@ -78,7 +96,7 @@ function EditorArea({ activeTab, content, onChange }: EditorAreaProps) {
     })
   }, [])
 
-  const themeName = document.documentElement.getAttribute('data-theme') === 'light' ? 'indra-light' : 'indra-dark'
+  const themeName = isDark ? 'indra-dark' : 'indra-light'
 
   if (!activeTab) {
     return (
