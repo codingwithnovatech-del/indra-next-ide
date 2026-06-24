@@ -1,7 +1,6 @@
 import { useState, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import type { FileNode } from '../types'
-import { saveSession } from '../data/virtualFileSystem'
 
 export function useCloudSync() {
   const [syncing, setSyncing] = useState(false)

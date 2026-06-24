@@ -111,7 +111,16 @@ function Dashboard({ projects, loading, onCreateProject, onDeleteProject, onOpen
                     </p>
                   </div>
                 </div>
-                <button onClick={(e) => { e.stopPropagation(); setConfirmDelete(p.id) }}
+                <button onClick={(e) => {
+                  e.stopPropagation()
+                  if (confirmDelete === p.id) {
+                    onDeleteProject(p.id)
+                    setConfirmDelete(null)
+                  } else {
+                    setConfirmDelete(p.id)
+                    setTimeout(() => setConfirmDelete(null), 3000)
+                  }
+                }}
                   className="px-3 py-1.5 rounded text-xs transition-colors"
                   style={{ color: 'var(--text-dim)' }}
                   onMouseEnter={(e) => e.currentTarget.style.color = '#f87171'}

@@ -49,7 +49,7 @@ function App() {
   }, [authLoading, session])
 
   const { projects, loading: projectsLoading, createProject, deleteProject } = useCloudProjects(user)
-  const { syncing, syncError, loadSnapshot, saveSnapshot } = useCloudSync()
+  const { syncing, loadSnapshot, saveSnapshot } = useCloudSync()
 
   const handleOpenProject = useCallback(async (id: string) => {
     setCurrentProjectId(id)
