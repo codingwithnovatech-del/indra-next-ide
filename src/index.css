@@ -1,0 +1,117 @@
+@import "tailwindcss";
+
+:root {
+  --bg-app: #1e1e1e;
+  --bg-sidebar: #252526;
+  --bg-tab: #2d2d2d;
+  --bg-tab-active: #1e1e1e;
+  --bg-hover: #2a2d2e;
+  --bg-active: #37373d;
+  --bg-input: #3c3c3c;
+  --bg-statusbar: #007acc;
+  --bg-overlay: rgba(0,0,0,0.5);
+  --text-primary: #cccccc;
+  --text-muted: #969696;
+  --text-dim: #858585;
+  --border: #1e1e1e;
+  --accent: #007acc;
+  --accent-hover: #0098ff;
+
+  --transition: 0.2s ease;
+}
+
+:root[data-theme="light"] {
+  --bg-app: #ffffff;
+  --bg-sidebar: #f3f3f3;
+  --bg-tab: #ececec;
+  --bg-tab-active: #ffffff;
+  --bg-hover: #e8e8e8;
+  --bg-active: #dcdcdc;
+  --bg-input: #ffffff;
+  --bg-overlay: rgba(0,0,0,0.3);
+  --text-primary: #333333;
+  --text-muted: #666666;
+  --text-dim: #999999;
+  --border: #e0e0e0;
+}
+
+.theme-transition,
+.theme-transition *,
+.theme-transition *::before,
+.theme-transition *::after {
+  transition: background-color var(--transition),
+              color var(--transition),
+              border-color var(--transition),
+              fill var(--transition),
+              stroke var(--transition) !important;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg-app);
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow: hidden;
+  -webkit-tap-highlight-color: transparent;
+  color: var(--text-primary);
+}
+
+#root {
+  min-height: 100vh;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #424242;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+::selection {
+  background: #264f78;
+}
+
+:root[data-theme="light"] ::selection {
+  background: #add6ff;
+}
+
+input,
+textarea {
+  color-scheme: dark;
+}
+
+:root[data-theme="light"] input,
+:root[data-theme="light"] textarea {
+  color-scheme: light;
+}
