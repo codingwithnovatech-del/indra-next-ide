@@ -7,11 +7,18 @@ export function useAuth() {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [message, setMessage] = useState<string | null>(null)
 
   useEffect(() => {
+    let cancelled = false
     supabase.auth.getSession().then(({ data: { session } }) => {
+      if (cancelled) return
       setSession(session)
       setUser(session?.user ?? null)
+      setLoading(false)
+    }).catch(() => {
+      if (cancelled) return
+      setError('Failed to connect to authentication server')
       setLoading(false)
     })
 
@@ -20,25 +27,29 @@ export function useAuth() {
       setUser(session?.user ?? null)
     })
 
-    return () => listener?.subscription.unsubscribe()
+    return () => { cancelled = true; listener?.subscription.unsubscribe() }
   }, [])
 
   const signUp = useCallback(async (email: string, password: string, name: string) => {
     setError(null)
+    setMessage(null)
     const { error } = await supabase.auth.signUp({ email, password, options: { data: { name } } })
     if (error) setError(error.message)
-    else setError('Check your email for the confirmation link.')
+    else setMessage('Check your email for the confirmation link.')
   }, [])
 
   const signIn = useCallback(async (email: string, password: string) => {
     setError(null)
+    setMessage(null)
     const { error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) setError(error.message)
   }, [])
 
   const signOut = useCallback(async () => {
+    setError(null)
+    setMessage(null)
     await supabase.auth.signOut()
   }, [])
 
-  return { session, user, loading, error, signUp, signIn, signOut, setError }
+  return { session, user, loading, error, message, signUp, signIn, signOut, setError }
 }

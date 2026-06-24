@@ -1,4 +1,4 @@
-import { memo } from 'react'
+import { memo, useRef, useState, useCallback, useEffect } from 'react'
 import type { TabItem } from '../types'
 
 interface TabBarProps {
@@ -11,9 +11,41 @@ interface TabBarProps {
 }
 
 function TabBar({ tabs, onSelect, onClose, onRun, isPreviewOpen, onTogglePreview }: TabBarProps) {
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const [canScrollLeft, setCanScrollLeft] = useState(false)
+  const [canScrollRight, setCanScrollRight] = useState(false)
+
+  const updateScrollState = useCallback(() => {
+    const el = scrollRef.current
+    if (!el) return
+    setCanScrollLeft(el.scrollLeft > 2)
+    setCanScrollRight(el.scrollLeft < el.scrollWidth - el.clientWidth - 2)
+  }, [])
+
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el) return
+    updateScrollState()
+    el.addEventListener('scroll', updateScrollState)
+    const ro = new ResizeObserver(updateScrollState)
+    ro.observe(el)
+    return () => { el.removeEventListener('scroll', updateScrollState); ro.disconnect() }
+  }, [tabs.length, updateScrollState])
+
+  const scrollBy = useCallback((amount: number) => {
+    scrollRef.current?.scrollBy({ left: amount, behavior: 'smooth' })
+  }, [])
+
   return (
     <div className="flex h-[36px] shrink-0 select-none" style={{ backgroundColor: 'var(--bg-sidebar)' }}>
-      <div className="flex flex-1 overflow-x-auto scrollbar-hide">
+      {canScrollLeft && (
+        <button onClick={() => scrollBy(-120)}
+          className="flex shrink-0 items-center justify-center w-[20px] transition-colors border-r"
+          style={{ color: 'var(--text-muted)', borderColor: 'var(--border)' }}>
+          <svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor"><path d="M10 12L6 8l4-4" stroke="currentColor" strokeWidth="1.5" fill="none" /></svg>
+        </button>
+      )}
+      <div ref={scrollRef} className="flex flex-1 overflow-x-auto scrollbar-hide">
         {tabs.map((tab) => (
           <div
             key={tab.id}
@@ -43,6 +75,13 @@ function TabBar({ tabs, onSelect, onClose, onRun, isPreviewOpen, onTogglePreview
           </div>
         ))}
       </div>
+      {canScrollRight && (
+        <button onClick={() => scrollBy(120)}
+          className="flex shrink-0 items-center justify-center w-[20px] transition-colors border-l"
+          style={{ color: 'var(--text-muted)', borderColor: 'var(--border)' }}>
+          <svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor"><path d="M6 12l4-4-4-4" stroke="currentColor" strokeWidth="1.5" fill="none" /></svg>
+        </button>
+      )}
 
       <div className="flex shrink-0 items-center gap-1 border-l px-2" style={{ borderColor: 'var(--border)' }}>
         <button

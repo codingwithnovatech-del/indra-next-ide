@@ -35,6 +35,16 @@ function findMaxId(root: FileNode): number {
   return max
 }
 
+function collectDescendantFiles(node: FileNode): string[] {
+  const ids: string[] = []
+  function walk(n: FileNode) {
+    if (n.type === 'file') ids.push(n.id)
+    n.children?.forEach(walk)
+  }
+  if (node.type === 'folder' && node.children) node.children.forEach(walk)
+  return ids
+}
+
 export function useFileSystem(workspaceId = 'default') {
   const initialized = useRef(false)
   const storageKey = SESSION_KEY(workspaceId)
@@ -58,6 +68,9 @@ export function useFileSystem(workspaceId = 'default') {
     const saved = loadSession<SessionData | null>(storageKey, null)
     return saved?.activeFileId ?? null
   })
+
+  const openFileIdsRef = useRef(openFileIds)
+  openFileIdsRef.current = openFileIds
 
   const flat = useMemo(() => flattenTree(root), [root])
 
@@ -93,12 +106,13 @@ export function useFileSystem(workspaceId = 'default') {
     setOpenFileIds((prev) => prev.filter((fid) => fid !== id))
     setActiveFileId((prev) => {
       if (prev !== id) return prev
-      const next = openFileIds.filter((fid) => fid !== id)
+      const ids = openFileIdsRef.current
+      const next = ids.filter((fid) => fid !== id)
       if (next.length === 0) return null
-      const idx = openFileIds.indexOf(id)
+      const idx = ids.indexOf(id)
       return next[Math.min(idx, next.length - 1)] ?? next[0]
     })
-  }, [openFileIds])
+  }, [])
 
   const updateContent = useCallback((id: string, content: string) => {
     setRoot((prev) => updateNodeContent(prev, id, content))
@@ -112,19 +126,23 @@ export function useFileSystem(workspaceId = 'default') {
         type === 'folder'
           ? { id, name, type: 'folder', children: [] }
           : { id, name, type: 'file', content: template ?? '' }
+      if (!flat.has(parentId)) return ''
       setRoot((prev) => addChild(prev, parentId, child))
       return id
     },
-    [],
+    [flat],
   )
 
   const deleteItem = useCallback(
     (id: string) => {
+      const node = flat.get(id)
+      const childIds = node ? collectDescendantFiles(node) : [id]
+      const allToRemove = new Set([id, ...childIds])
       setRoot((prev) => removeNode(prev, id) ?? prev)
-      setOpenFileIds((prev) => prev.filter((fid) => fid !== id))
-      setActiveFileId((prev) => (prev === id ? null : prev))
+      setOpenFileIds((prev) => prev.filter((fid) => !allToRemove.has(fid)))
+      setActiveFileId((prev) => (allToRemove.has(prev as string) ? null : prev))
     },
-    [],
+    [flat],
   )
 
   const renameItem = useCallback((id: string, newName: string) => {

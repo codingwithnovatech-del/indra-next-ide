@@ -22,34 +22,44 @@ function collectFiles(node: FileNode, results: FileNode[] = []): FileNode[] {
   return results
 }
 
-function searchInContent(content: string, query: string, fileId: string, fileName: string): SearchResult[] {
-  const lowerContent = content.toLowerCase()
-  const lowerQuery = query.toLowerCase()
+function searchInContent(content: string, query: string, fileId: string, fileName: string, caseSensitive: boolean, wholeWord: boolean): SearchResult[] {
   const results: SearchResult[] = []
-  let idx = 0
-  let lineNum = 1
-  let lineStart = 0
+  const source = caseSensitive ? content : content.toLowerCase()
+  const search = caseSensitive ? query : query.toLowerCase()
+  let pos = 0
 
-  for (let i = 0; i < content.length; i++) {
-    if (content[i] === '\n') {
-      lineNum++
-      lineStart = i + 1
-    }
-    idx = lowerContent.indexOf(lowerQuery, idx)
+  while (true) {
+    const idx = source.indexOf(search, pos)
     if (idx === -1) break
+
+    if (wholeWord) {
+      const charBefore = idx > 0 ? source[idx - 1] : ' '
+      const charAfter = idx + search.length < source.length ? source[idx + search.length] : ' '
+      if (/\w/.test(charBefore) || /\w/.test(charAfter)) {
+        pos = idx + 1
+        continue
+      }
+    }
+
+    let lineNum = 1
+    let lineStart = 0
+    for (let i = 0; i < idx; i++) {
+      if (content[i] === '\n') { lineNum++; lineStart = i + 1 }
+    }
+
     const lineEnd = content.indexOf('\n', idx)
     const lineText = content.slice(lineStart, lineEnd === -1 ? undefined : lineEnd)
-    
+
     results.push({
       fileId,
       fileName,
       line: lineNum,
-      text: lineText.trim(),
+      text: lineText,
       matchStart: idx - lineStart,
       matchEnd: idx - lineStart + query.length,
     })
-    
-    idx += query.length
+
+    pos = idx + query.length
   }
 
   return results
@@ -65,15 +75,14 @@ function SearchPanel({ root, onFileClick, onClose }: SearchPanelProps) {
 
   const results = useMemo(() => {
     if (!query.trim()) return []
-    const q = isWholeWord ? `\\b${query}\\b` : query
     const all: SearchResult[] = []
     for (const file of allFiles) {
       if (!file.content) continue
-      const matches = searchInContent(file.content, q, file.id, file.name)
+      const matches = searchInContent(file.content, query, file.id, file.name, isCaseSensitive, isWholeWord)
       all.push(...matches)
     }
     return all
-  }, [allFiles, query, isWholeWord])
+  }, [allFiles, query, isCaseSensitive, isWholeWord])
 
   const fileCount = useMemo(() => {
     const ids = new Set(results.map((r) => r.fileId))
@@ -145,12 +154,14 @@ function SearchPanel({ root, onFileClick, onClose }: SearchPanelProps) {
                 onClick={() => onFileClick(r.fileId)}
               >
                 <span className="shrink-0 w-6 text-right" style={{ color: 'var(--text-dim)' }}>{r.line}</span>
-                <span className="truncate" style={{ color: 'var(--text-muted)' }}>
+                <span className="truncate whitespace-pre" style={{ color: 'var(--text-muted)' }}>
                   {r.text.slice(0, Math.max(0, r.matchStart))}
-                  <span style={{ backgroundColor: 'rgba(0,122,204,0.3)' }}>
-                    {r.text.slice(Math.max(0, r.matchStart), Math.max(0, r.matchEnd))}
-                  </span>
-                  {r.text.slice(Math.max(0, r.matchEnd))}
+                  {r.matchStart <= r.text.length && (
+                    <span style={{ backgroundColor: 'rgba(0,122,204,0.3)' }}>
+                      {r.text.slice(Math.max(0, r.matchStart), Math.min(r.text.length, Math.max(0, r.matchEnd)))}
+                    </span>
+                  )}
+                  {r.text.slice(Math.min(r.text.length, Math.max(0, r.matchEnd)))}
                 </span>
               </div>
             </div>

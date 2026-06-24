@@ -30,11 +30,7 @@ export function useTheme() {
   const [mode, setMode] = useState<ThemeMode>(loadTheme)
 
   const toggleTheme = useCallback(() => {
-    setMode((prev) => {
-      const next = prev === 'dark' ? 'light' : prev === 'light' ? 'auto' : 'dark'
-      try { localStorage.setItem(STORAGE_KEY, next) } catch { /* ignore */ }
-      return next
-    })
+    setMode((prev) => prev === 'dark' ? 'light' : prev === 'light' ? 'auto' : 'dark')
   }, [])
 
   useEffect(() => {

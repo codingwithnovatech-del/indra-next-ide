@@ -1,30 +1,47 @@
 import type { FileNode } from '../types'
 
-function resolveByFileName(filename: string, flat: Map<string, FileNode>): string | null {
-  const basename = filename.split('/').pop() ?? filename
+interface PathEntry { name: string; content: string; path: string }
+
+function buildPathMap(flat: Map<string, FileNode>): Map<string, PathEntry> {
+  const pathMap = new Map<string, PathEntry>()
   for (const [, node] of flat) {
-    if (node.type === 'file' && node.name === basename) {
-      return node.content ?? ''
+    if (node.type === 'file' && node.content !== undefined) {
+      pathMap.set(node.name.toLowerCase(), { name: node.name, content: node.content, path: node.name })
+      const dotted = node.name.replace(/\./g, '')
+      if (dotted !== node.name) pathMap.set(dotted.toLowerCase(), { name: node.name, content: node.content, path: node.name })
     }
   }
-  return null
+  return pathMap
+}
+
+const PATH_CACHE = new WeakMap<Map<string, FileNode>, Map<string, PathEntry>>()
+
+function resolveFile(ref: string, flat: Map<string, FileNode>): string | null {
+  let pathMap = PATH_CACHE.get(flat)
+  if (!pathMap) {
+    pathMap = buildPathMap(flat)
+    PATH_CACHE.set(flat, pathMap)
+  }
+  const key = ref.split('/').pop()?.toLowerCase() ?? ref.toLowerCase()
+  const entry = pathMap.get(key)
+  return entry ? entry.content : null
 }
 
 export function bundleHtml(content: string, flat: Map<string, FileNode>): string {
   let result = content.replace(
     /<link\s+[^>]*href="([^"]+)"[^>]*>/gi,
     (match, href) => {
-      const resolved = resolveByFileName(href, flat)
+      const resolved = resolveFile(href, flat)
       if (resolved) return `<style>${resolved}</style>`
-      return match
+      return match.replace(/<link\s+/i, '<link disabled ')
     },
   )
   result = result.replace(
     /<script\s+[^>]*src="([^"]+)"[^>]*>/gi,
     (match, src) => {
-      const resolved = resolveByFileName(src, flat)
+      const resolved = resolveFile(src, flat)
       if (resolved) return `<script>\n${resolved}\n</script>`
-      return match
+      return `<!-- Script not found: ${src} -->`
     },
   )
   return result

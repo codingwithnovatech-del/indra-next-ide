@@ -6,10 +6,13 @@ import { useAuth } from './hooks/useAuth'
 import { useCloudProjects } from './hooks/useCloudProjects'
 import { useCloudSync } from './hooks/useCloudSync'
 import { bundleForPreview } from './data/previewBundler'
+import ActivityBar from './components/ActivityBar'
+import type { ActivityBarView } from './components/ActivityBar'
 import HamburgerButton from './components/HamburgerButton'
 import Sidebar from './components/Sidebar'
 import TabBar from './components/TabBar'
 import EditorArea from './components/EditorArea'
+import Breadcrumbs from './components/Breadcrumbs'
 import LivePreview from './components/LivePreview'
 import CommandPalette from './components/CommandPalette'
 import type { Command } from './components/CommandPalette'
@@ -36,7 +39,7 @@ function getLanguage(filename: string): string {
 }
 
 function App() {
-  const { session, user, loading: authLoading, error: authError, signUp, signIn, signOut, setError: setAuthError } = useAuth()
+  const { session, user, loading: authLoading, error: authError, message: authMessage, signUp, signIn, signOut, setError: setAuthError } = useAuth()
   const { mode: themeMode, toggleTheme, setMode } = useTheme()
 
   const [screen, setScreen] = useState<Screen>('loading')
@@ -90,14 +93,14 @@ function App() {
     replaceRoot,
   } = useFileSystem(currentProjectId ?? 'default')
 
-  const cloudLoaded = useRef(false)
+  const cloudLoadedRef = useRef<string | null>(null)
   useEffect(() => {
-    if (!isIDE || !currentProjectId || cloudLoaded.current) return
-    cloudLoaded.current = true
+    if (!isIDE || !currentProjectId) return
+    if (cloudLoadedRef.current === currentProjectId) return
+    cloudLoadedRef.current = currentProjectId
     loadSnapshot(currentProjectId).then((snapshot) => {
       if (snapshot && snapshot.children) {
-        const openIds: string[] = []
-        replaceRoot(snapshot, openIds, null)
+        replaceRoot(snapshot, [], null)
       }
     })
   }, [isIDE, currentProjectId, loadSnapshot, replaceRoot])
@@ -120,7 +123,13 @@ function App() {
   const [manualPreviewContent, setManualPreviewContent] = useState('')
   const [paletteOpen, setPaletteOpen] = useState(false)
   const [paletteMode, setPaletteMode] = useState<'files' | 'commands'>('files')
+  const [sidebarView, setSidebarView] = useState<ActivityBarView>('explorer')
+  const [renamingId, setRenamingId] = useState<string | null>(null)
   const isMobile = useMediaQuery('(max-width: 767px)')
+  const paletteOpenRef = useRef(paletteOpen)
+  paletteOpenRef.current = paletteOpen
+  const isIDERef = useRef(isIDE)
+  isIDERef.current = isIDE
 
   const activeTab = openFiles.find((t) => t.isActive)
 
@@ -139,7 +148,9 @@ function App() {
 
   const handleTogglePreview = useCallback(() => {
     setPreviewOpen((prev) => {
-      if (!prev) setManualPreviewContent(computePreview())
+      if (!prev) {
+        requestAnimationFrame(() => setManualPreviewContent(computePreview()))
+      }
       return !prev
     })
   }, [computePreview])
@@ -148,6 +159,11 @@ function App() {
   const handleCloseTab = useCallback((id: string) => closeFile(id), [closeFile])
   const toggleSidebar = useCallback(() => setSidebarOpen((p) => !p), [])
   const closeSidebar = useCallback(() => setSidebarOpen(false), [])
+
+  const handleViewChange = useCallback((view: ActivityBarView) => {
+    setSidebarView(view)
+    if (isMobile) setSidebarOpen(true)
+  }, [isMobile])
 
   const handleEditorChange = useCallback(
     (value: string | undefined) => {
@@ -168,6 +184,15 @@ function App() {
     (parentId: string, type: 'file' | 'folder', name: string) => createItem(parentId, type, name),
     [createItem],
   )
+
+  const handlePaletteCreateFile = useCallback((name: string) => {
+    const id = createItem(vfsRoot.id, 'file', name)
+    if (id) openFile(id)
+  }, [createItem, openFile, vfsRoot.id])
+
+  const handleClosePreview = useCallback(() => setPreviewOpen(false), [])
+  const handleToggleAutoRefresh = useCallback(() => setAutoRefresh((p) => !p), [])
+  const handlePreviewManualRun = useCallback(() => setManualPreviewContent(computePreview()), [computePreview])
 
   const allFiles = useMemo(() => {
     const result: FileNode[] = []
@@ -193,18 +218,18 @@ function App() {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (!isIDE) return
+      if (!isIDERef.current) return
       if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'p') {
         e.preventDefault(); setPaletteMode('commands'); setPaletteOpen(true); return
       }
       if ((e.metaKey || e.ctrlKey) && e.key === 'p') {
         e.preventDefault(); setPaletteMode('files'); setPaletteOpen(true); return
       }
-      if (e.key === 'Escape' && paletteOpen) setPaletteOpen(false)
+      if (e.key === 'Escape' && paletteOpenRef.current) setPaletteOpen(false)
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [paletteOpen, isIDE])
+  }, [])
 
   if (screen === 'loading') return <LoadingScreen />
   if (screen === 'login') {
@@ -213,6 +238,7 @@ function App() {
         onSignIn={signIn}
         onSignUp={signUp}
         error={authError}
+        message={authMessage}
         setError={setAuthError}
         themeMode={themeMode}
         onToggleTheme={toggleTheme}
@@ -248,18 +274,9 @@ function App() {
 
       <HamburgerButton isOpen={sidebarOpen} onClick={toggleSidebar} />
 
-      {openFiles.length > 0 && (
-        <TabBar
-          tabs={openFiles}
-          onSelect={handleSelectTab}
-          onClose={handleCloseTab}
-          onRun={handleRun}
-          isPreviewOpen={previewOpen}
-          onTogglePreview={handleTogglePreview}
-        />
-      )}
-
       <div className="flex flex-1 overflow-hidden">
+        <ActivityBar activeView={sidebarView} onViewChange={handleViewChange} />
+
         <Sidebar
           root={vfsRoot}
           activeFileId={activeFileId}
@@ -268,31 +285,49 @@ function App() {
           onRename={renameItem}
           onDelete={deleteItem}
           isOpen={sidebarOpen}
+          view={sidebarView}
+          renamingId={renamingId}
+          onStartRename={setRenamingId}
         />
 
         {isMobile && sidebarOpen && (
           <div className="fixed inset-0 z-30" style={{ backgroundColor: 'var(--bg-overlay)' }} onClick={closeSidebar} />
         )}
 
-        <div className="flex flex-1 overflow-hidden">
-          <EditorArea
-            activeTab={activeTab}
-            content={activeTab ? flat.get(activeTab.id)?.content ?? '' : ''}
-            onChange={handleEditorChange}
-          />
-
-          {previewOpen && !isMobile && (
-            <div className="w-1/2 min-w-[320px] border-l" style={{ borderColor: 'var(--border)' }}>
-              <LivePreview
-                content={previewContent}
-                autoRefresh={autoRefresh}
-                fileName={activeTab?.name}
-                onClose={() => setPreviewOpen(false)}
-                onToggleAutoRefresh={() => setAutoRefresh((p) => !p)}
-                onRun={() => setManualPreviewContent(computePreview())}
-              />
-            </div>
+        <div className="flex flex-1 flex-col overflow-hidden">
+          {openFiles.length > 0 && (
+            <TabBar
+              tabs={openFiles}
+              onSelect={handleSelectTab}
+              onClose={handleCloseTab}
+              onRun={handleRun}
+              isPreviewOpen={previewOpen}
+              onTogglePreview={handleTogglePreview}
+            />
           )}
+
+          <Breadcrumbs root={vfsRoot} activeFileId={activeFileId} onNavigate={handleFileClick} />
+
+          <div className="flex flex-1 overflow-hidden">
+            <EditorArea
+              activeTab={activeTab}
+              content={activeTab ? flat.get(activeTab.id)?.content ?? '' : ''}
+              onChange={handleEditorChange}
+            />
+
+            {previewOpen && !isMobile && (
+              <div className="w-1/2 min-w-[320px] border-l" style={{ borderColor: 'var(--border)' }}>
+                <LivePreview
+                  content={previewContent}
+                  autoRefresh={autoRefresh}
+                  fileName={activeTab?.name}
+                  onClose={handleClosePreview}
+                  onToggleAutoRefresh={handleToggleAutoRefresh}
+                  onRun={handlePreviewManualRun}
+                />
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -302,9 +337,9 @@ function App() {
             content={previewContent}
             autoRefresh={autoRefresh}
             fileName={activeTab?.name}
-            onClose={() => setPreviewOpen(false)}
-            onToggleAutoRefresh={() => setAutoRefresh((p) => !p)}
-            onRun={() => setManualPreviewContent(computePreview())}
+            onClose={handleClosePreview}
+            onToggleAutoRefresh={handleToggleAutoRefresh}
+            onRun={handlePreviewManualRun}
           />
         </div>
       )}
@@ -332,10 +367,7 @@ function App() {
         commands={commands}
         activeFileId={activeFileId}
         onFileClick={handleFileClick}
-        onCreateFile={(name) => {
-          const id = createItem(vfsRoot.id, 'file', name)
-          openFile(id)
-        }}
+        onCreateFile={handlePaletteCreateFile}
       />
     </div>
   )

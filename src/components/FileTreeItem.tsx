@@ -1,5 +1,6 @@
 import { memo, useState, useRef, useEffect, useCallback } from 'react'
 import type { FileNode } from '../types'
+import { getFileIconColor, getFolderIconColor } from '../data/fileIcons'
 
 interface FileTreeItemProps {
   node: FileNode
@@ -11,16 +12,6 @@ interface FileTreeItemProps {
   onRename: (id: string, name: string) => void
   onDelete: (id: string) => void
   onCreateChild: (parentId: string, type: 'file' | 'folder') => void
-}
-
-function getFileIconColor(name: string): string {
-  const ext = name.split('.').pop()?.toLowerCase()
-  const map: Record<string, string> = {
-    tsx: '#519aba', ts: '#519aba', js: '#f7df1e', jsx: '#f7df1e',
-    html: '#e44d26', css: '#42a5f5', json: '#f5a623',
-    md: '#9e9e9e', svg: '#ffb74d', py: '#3572a5',
-  }
-  return map[ext ?? ''] ?? '#9e9e9e'
 }
 
 function FileTreeItem({
@@ -103,7 +94,7 @@ function FileTreeItem({
           viewBox="0 0 16 16"
           fill="currentColor"
           className={`shrink-0 transition-transform duration-150 ${isFolder && expanded ? 'rotate-0' : ''}`}
-          style={{ color: isFolder ? '#dcb67a' : getFileIconColor(node.name) }}
+          style={{ color: isFolder ? getFolderIconColor() : getFileIconColor(node.name) }}
         >
           {isFolder ? (
             expanded ? (

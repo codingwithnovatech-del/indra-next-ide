@@ -1,9 +1,8 @@
-import { memo, useCallback, useState } from 'react'
+import { memo, useCallback } from 'react'
 import { FileTree } from './FileTree'
 import SearchPanel from './SearchPanel'
 import type { FileNode } from '../types'
-
-type SidebarView = 'explorer' | 'search'
+import type { ActivityBarView } from './ActivityBar'
 
 interface SidebarProps {
   root: FileNode
@@ -13,6 +12,9 @@ interface SidebarProps {
   onRename: (id: string, name: string) => void
   onDelete: (id: string) => void
   isOpen: boolean
+  view: ActivityBarView
+  renamingId: string | null
+  onStartRename: (id: string | null) => void
 }
 
 function Sidebar({
@@ -23,25 +25,25 @@ function Sidebar({
   onRename,
   onDelete,
   isOpen,
+  view,
+  renamingId,
+  onStartRename,
 }: SidebarProps) {
-  const [view, setView] = useState<SidebarView>('explorer')
-  const [renamingId, setRenamingId] = useState<string | null>(null)
-
   const handleCreateChild = useCallback(
     (parentId: string, type: 'file' | 'folder') => {
       const baseName = type === 'file' ? 'new-file.ts' : 'new-folder'
       const id = onCreateItem(parentId, type, baseName)
-      setRenamingId(id)
+      onStartRename(id)
     },
-    [onCreateItem],
+    [onCreateItem, onStartRename],
   )
 
   const handleRename = useCallback(
     (id: string, name: string) => {
       onRename(id, name)
-      setRenamingId(null)
+      onStartRename(null)
     },
-    [onRename],
+    [onRename, onStartRename],
   )
 
   return (
@@ -52,35 +54,6 @@ function Sidebar({
                   ${isOpen ? 'max-md:translate-x-0' : 'max-md:-translate-x-full'}`}
       style={{ backgroundColor: 'var(--bg-sidebar)', borderColor: 'var(--border)', color: 'var(--text-primary)' }}
     >
-      <div className="flex shrink-0 border-b" style={{ borderColor: 'var(--border)' }}>
-        <button
-          onClick={() => setView('explorer')}
-          className="flex-1 flex items-center justify-center h-[36px] text-[11px] font-semibold uppercase tracking-wider gap-1.5 transition-colors"
-          style={{
-            color: view === 'explorer' ? 'var(--text-primary)' : 'var(--text-dim)',
-            borderBottom: view === 'explorer' ? '2px solid var(--accent)' : '2px solid transparent',
-          }}
-        >
-          <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
-            <path d="M1 2.5A1.5 1.5 0 012.5 1h3.207a1.5 1.5 0 011.06.44l1.122 1.12H13.5A1.5 1.5 0 0115 4.06v8.44a1.5 1.5 0 01-1.5 1.5h-11A1.5 1.5 0 011 12.5V2.5z" />
-          </svg>
-          Files
-        </button>
-        <button
-          onClick={() => setView('search')}
-          className="flex-1 flex items-center justify-center h-[36px] text-[11px] font-semibold uppercase tracking-wider gap-1.5 transition-colors"
-          style={{
-            color: view === 'search' ? 'var(--text-primary)' : 'var(--text-dim)',
-            borderBottom: view === 'search' ? '2px solid var(--accent)' : '2px solid transparent',
-          }}
-        >
-          <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
-            <path d="M11.742 10.344a6.5 6.5 0 10-1.397 1.398l3.85 3.85a1 1 0 001.415-1.414l-3.868-3.834zm-5.242.156a5 5 0 110-10 5 5 0 010 10z" />
-          </svg>
-          Search
-        </button>
-      </div>
-
       {view === 'explorer' ? (
         <>
           <div className="flex items-center justify-between px-3 h-[30px] text-[11px] font-semibold uppercase tracking-wider select-none"
@@ -117,7 +90,7 @@ function Sidebar({
                 activeFileId={activeFileId}
                 renamingId={renamingId}
                 onFileClick={onFileClick}
-                onStartRename={setRenamingId}
+                onStartRename={onStartRename}
                 onRename={handleRename}
                 onDelete={onDelete}
                 onCreateChild={handleCreateChild}
@@ -125,9 +98,39 @@ function Sidebar({
             )}
           </div>
         </>
-      ) : (
-        <SearchPanel root={root} onFileClick={onFileClick} onClose={() => setView('explorer')} />
-      )}
+      ) : view === 'search' ? (
+        <SearchPanel root={root} onFileClick={onFileClick} onClose={() => onStartRename(null)} />
+      ) : view === 'git' ? (
+        <div className="flex flex-1 items-center justify-center text-xs" style={{ color: 'var(--text-dim)' }}>
+          <div className="text-center p-4">
+            <svg width="32" height="32" viewBox="0 0 16 16" fill="currentColor" className="mx-auto mb-2 opacity-40">
+              <path d="M2 2v12h4V2H2zm1 1h2v3H3V3zm0 4h2v7H3V7zm5-5v12h4V2H8zm1 1h2v7H9V3zm0 8h2v3H9v-3zm5-5v9h4V6h-4zm1 1h2v7h-2V7zm0 8h2v2h-2v-2z" />
+            </svg>
+            <p className="text-sm font-medium mb-1">Source Control</p>
+            <p className="text-xs opacity-60">Git integration coming soon</p>
+          </div>
+        </div>
+      ) : view === 'extensions' ? (
+        <div className="flex flex-1 items-center justify-center text-xs" style={{ color: 'var(--text-dim)' }}>
+          <div className="text-center p-4">
+            <svg width="32" height="32" viewBox="0 0 16 16" fill="currentColor" className="mx-auto mb-2 opacity-40">
+              <path d="M3.5 0h5.707a1.5 1.5 0 011.06.44l2.793 2.793A1.5 1.5 0 0113.5 4.293V12.5a1.5 1.5 0 01-1.5 1.5h-1v-1h1a.5.5 0 00.5-.5V4.707a.5.5 0 00-.146-.353L9.646 1.646A.5.5 0 009.293 1.5H3.5a.5.5 0 00-.5.5v1h-1V2a2 2 0 012-2zm0 4h5.5v1H3.5V4zm0 3h5.5v1H3.5V7zm0 3h3.5v1H3.5v-1z" />
+            </svg>
+            <p className="text-sm font-medium mb-1">Extensions</p>
+            <p className="text-xs opacity-60">Extension marketplace coming soon</p>
+          </div>
+        </div>
+      ) : view === 'settings' ? (
+        <div className="flex flex-1 items-center justify-center text-xs" style={{ color: 'var(--text-dim)' }}>
+          <div className="text-center p-4">
+            <svg width="32" height="32" viewBox="0 0 16 16" fill="currentColor" className="mx-auto mb-2 opacity-40">
+              <path d="M8 2.5a5.5 5.5 0 00-5.466 4.826L1.5 8l1.034.674A5.5 5.5 0 008 13.5a5.5 5.5 0 005.466-4.826L14.5 8l-1.034-.674A5.5 5.5 0 008 2.5zm0 9a3.5 3.5 0 110-7 3.5 3.5 0 010 7zm0-1.5a2 2 0 100-4 2 2 0 000 4z" />
+            </svg>
+            <p className="text-sm font-medium mb-1">Settings</p>
+            <p className="text-xs opacity-60">Settings editor coming soon</p>
+          </div>
+        </div>
+      ) : null}
     </aside>
   )
 }

@@ -5,12 +5,13 @@ interface LoginPageProps {
   onSignIn: (email: string, password: string) => void
   onSignUp: (email: string, password: string, name: string) => void
   error: string | null
+  message?: string | null
   setError: (msg: string | null) => void
   themeMode: ThemeMode
   onToggleTheme: () => void
 }
 
-function LoginPage({ onSignIn, onSignUp, error, setError, themeMode, onToggleTheme }: LoginPageProps) {
+function LoginPage({ onSignIn, onSignUp, error, message, setError, themeMode, onToggleTheme }: LoginPageProps) {
   const [isSignUp, setIsSignUp] = useState(false)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -70,6 +71,11 @@ function LoginPage({ onSignIn, onSignUp, error, setError, themeMode, onToggleThe
           {error && (
             <div className="text-xs p-2 rounded" style={{ backgroundColor: 'rgba(239,68,68,0.15)', color: '#f87171' }}>
               {error}
+            </div>
+          )}
+          {message && (
+            <div className="text-xs p-2 rounded" style={{ backgroundColor: 'rgba(0,122,204,0.15)', color: '#60a5fa' }}>
+              {message}
             </div>
           )}
 

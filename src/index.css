@@ -3,6 +3,7 @@
 :root {
   --bg-app: #1e1e1e;
   --bg-sidebar: #252526;
+  --bg-activitybar: #333333;
   --bg-tab: #2d2d2d;
   --bg-tab-active: #1e1e1e;
   --bg-hover: #2a2d2e;
@@ -13,7 +14,7 @@
   --text-primary: #cccccc;
   --text-muted: #969696;
   --text-dim: #858585;
-  --border: #1e1e1e;
+  --border: #333333;
   --accent: #007acc;
   --accent-hover: #0098ff;
 
@@ -23,16 +24,17 @@
 :root[data-theme="light"] {
   --bg-app: #ffffff;
   --bg-sidebar: #f3f3f3;
+  --bg-activitybar: #e8e8e8;
   --bg-tab: #ececec;
   --bg-tab-active: #ffffff;
   --bg-hover: #e8e8e8;
-  --bg-active: #dcdcdc;
   --bg-input: #ffffff;
   --bg-overlay: rgba(0,0,0,0.3);
-  --text-primary: #333333;
-  --text-muted: #666666;
+  --text-primary: #1e1e1e;
+  --text-muted: #616161;
   --text-dim: #999999;
   --border: #e0e0e0;
+  --bg-statusbar: #007acc;
 }
 
 .theme-transition,
