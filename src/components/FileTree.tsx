@@ -11,6 +11,7 @@ interface FileTreeProps {
   onRename: (id: string, name: string) => void
   onDelete: (id: string) => void
   onCreateChild: (parentId: string, type: 'file' | 'folder') => void
+  onContextMenu?: (e: React.MouseEvent, fileId: string) => void
 }
 
 function FileTree({
@@ -22,6 +23,7 @@ function FileTree({
   onRename,
   onDelete,
   onCreateChild,
+  onContextMenu,
 }: FileTreeProps) {
   return (
     <div>
@@ -37,6 +39,7 @@ function FileTree({
           onRename={onRename}
           onDelete={onDelete}
           onCreateChild={onCreateChild}
+          onContextMenu={onContextMenu}
         />
       ))}
     </div>

@@ -1,8 +1,11 @@
 import { memo, useCallback } from 'react'
 import { FileTree } from './FileTree'
 import SearchPanel from './SearchPanel'
+import SettingsPanel from './SettingsPanel'
 import type { FileNode } from '../types'
 import type { ActivityBarView } from './ActivityBar'
+import type { ThemeMode } from '../hooks/useTheme'
+import type { Settings } from './SettingsPanel'
 
 interface SidebarProps {
   root: FileNode
@@ -15,6 +18,11 @@ interface SidebarProps {
   view: ActivityBarView
   renamingId: string | null
   onStartRename: (id: string | null) => void
+  themeMode?: ThemeMode
+  onThemeChange?: (mode: ThemeMode) => void
+  settings?: Settings
+  onSettingsChange?: (settings: Settings) => void
+  onContextMenu?: (e: React.MouseEvent, fileId: string) => void
 }
 
 function Sidebar({
@@ -28,6 +36,11 @@ function Sidebar({
   view,
   renamingId,
   onStartRename,
+  themeMode,
+  onThemeChange,
+  settings,
+  onSettingsChange,
+  onContextMenu,
 }: SidebarProps) {
   const handleCreateChild = useCallback(
     (parentId: string, type: 'file' | 'folder') => {
@@ -54,7 +67,7 @@ function Sidebar({
                   ${isOpen ? 'max-md:translate-x-0' : 'max-md:-translate-x-full'}`}
       style={{ backgroundColor: 'var(--bg-sidebar)', borderColor: 'var(--border)', color: 'var(--text-primary)' }}
     >
-      {view === 'explorer' ? (
+      {view === 'explorer' && (
         <>
           <div className="flex items-center justify-between px-3 h-[30px] text-[11px] font-semibold uppercase tracking-wider select-none"
                style={{ color: 'var(--text-muted)' }}>
@@ -84,7 +97,7 @@ function Sidebar({
             </span>
           </div>
           <div className="flex-1 overflow-y-auto pt-1">
-            {root.children && (
+            {root.children && root.children.length > 0 ? (
               <FileTree
                 nodes={root.children}
                 activeFileId={activeFileId}
@@ -94,13 +107,32 @@ function Sidebar({
                 onRename={handleRename}
                 onDelete={onDelete}
                 onCreateChild={handleCreateChild}
+                onContextMenu={onContextMenu}
               />
+            ) : (
+              <div className="flex flex-col items-center justify-center h-full text-xs p-4 text-center"
+                   style={{ color: 'var(--text-dim)' }}>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="mb-2 opacity-40">
+                  <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+                  <polyline points="14 2 14 8 20 8" />
+                </svg>
+                <p className="mb-2">No files in workspace</p>
+                <button onClick={() => handleCreateChild(root.id, 'file')}
+                  className="px-3 py-1 rounded text-xs"
+                  style={{ backgroundColor: 'var(--accent)', color: 'white' }}>
+                  + New File
+                </button>
+              </div>
             )}
           </div>
         </>
-      ) : view === 'search' ? (
+      )}
+
+      {view === 'search' && (
         <SearchPanel root={root} onFileClick={onFileClick} onClose={() => onStartRename(null)} />
-      ) : view === 'git' ? (
+      )}
+
+      {view === 'git' && (
         <div className="flex flex-1 items-center justify-center text-xs" style={{ color: 'var(--text-dim)' }}>
           <div className="text-center p-4">
             <svg width="32" height="32" viewBox="0 0 16 16" fill="currentColor" className="mx-auto mb-2 opacity-40">
@@ -110,7 +142,9 @@ function Sidebar({
             <p className="text-xs opacity-60">Git integration coming soon</p>
           </div>
         </div>
-      ) : view === 'extensions' ? (
+      )}
+
+      {view === 'extensions' && (
         <div className="flex flex-1 items-center justify-center text-xs" style={{ color: 'var(--text-dim)' }}>
           <div className="text-center p-4">
             <svg width="32" height="32" viewBox="0 0 16 16" fill="currentColor" className="mx-auto mb-2 opacity-40">
@@ -120,17 +154,16 @@ function Sidebar({
             <p className="text-xs opacity-60">Extension marketplace coming soon</p>
           </div>
         </div>
-      ) : view === 'settings' ? (
-        <div className="flex flex-1 items-center justify-center text-xs" style={{ color: 'var(--text-dim)' }}>
-          <div className="text-center p-4">
-            <svg width="32" height="32" viewBox="0 0 16 16" fill="currentColor" className="mx-auto mb-2 opacity-40">
-              <path d="M8 2.5a5.5 5.5 0 00-5.466 4.826L1.5 8l1.034.674A5.5 5.5 0 008 13.5a5.5 5.5 0 005.466-4.826L14.5 8l-1.034-.674A5.5 5.5 0 008 2.5zm0 9a3.5 3.5 0 110-7 3.5 3.5 0 010 7zm0-1.5a2 2 0 100-4 2 2 0 000 4z" />
-            </svg>
-            <p className="text-sm font-medium mb-1">Settings</p>
-            <p className="text-xs opacity-60">Settings editor coming soon</p>
-          </div>
-        </div>
-      ) : null}
+      )}
+
+      {view === 'settings' && themeMode && onThemeChange && settings !== undefined && onSettingsChange && (
+        <SettingsPanel
+          themeMode={themeMode}
+          onThemeChange={onThemeChange}
+          settings={settings}
+          onSettingsChange={onSettingsChange}
+        />
+      )}
     </aside>
   )
 }

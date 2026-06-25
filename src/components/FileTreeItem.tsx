@@ -12,6 +12,7 @@ interface FileTreeItemProps {
   onRename: (id: string, name: string) => void
   onDelete: (id: string) => void
   onCreateChild: (parentId: string, type: 'file' | 'folder') => void
+  onContextMenu?: (e: React.MouseEvent, fileId: string) => void
 }
 
 function FileTreeItem({
@@ -24,6 +25,7 @@ function FileTreeItem({
   onRename,
   onDelete,
   onCreateChild,
+  onContextMenu,
 }: FileTreeItemProps) {
   const [expanded, setExpanded] = useState(true)
   const [isHovered, setIsHovered] = useState(false)
@@ -88,6 +90,7 @@ function FileTreeItem({
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
         onClick={handleClick}
+        onContextMenu={(e) => onContextMenu?.(e, node.id)}
       >
         <svg
           width="16"
@@ -183,6 +186,7 @@ function FileTreeItem({
           onRename={onRename}
           onDelete={onDelete}
           onCreateChild={onCreateChild}
+          onContextMenu={onContextMenu}
         />
       ))}
     </>

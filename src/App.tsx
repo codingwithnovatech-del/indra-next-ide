@@ -5,6 +5,7 @@ import { useTheme } from './hooks/useTheme'
 import { useAuth } from './hooks/useAuth'
 import { useCloudProjects } from './hooks/useCloudProjects'
 import { useCloudSync } from './hooks/useCloudSync'
+import { useSettings } from './hooks/useSettings'
 import { bundleForPreview } from './data/previewBundler'
 import ActivityBar from './components/ActivityBar'
 import type { ActivityBarView } from './components/ActivityBar'
@@ -20,9 +21,15 @@ import StatusBar from './components/StatusBar'
 import LoginPage from './components/LoginPage'
 import Dashboard from './components/Dashboard'
 import LoadingScreen from './components/LoadingScreen'
+import ContextMenu from './components/ContextMenu'
+import type { ContextMenuItem } from './components/ContextMenu'
+import TerminalPanel from './components/TerminalPanel'
+import ProblemsPanel from './components/ProblemsPanel'
 import type { FileNode } from './types'
 
 type Screen = 'loading' | 'login' | 'dashboard' | 'ide'
+
+type BottomPanelTab = 'terminal' | 'problems'
 
 function getLanguage(filename: string): string {
   const ext = filename.split('.').pop()?.toLowerCase()
@@ -41,6 +48,7 @@ function getLanguage(filename: string): string {
 function App() {
   const { session, user, loading: authLoading, error: authError, message: authMessage, signUp, signIn, signOut, setError: setAuthError } = useAuth()
   const { mode: themeMode, toggleTheme, setMode, isDark } = useTheme()
+  const { settings, updateSettings } = useSettings()
 
   const [screen, setScreen] = useState<Screen>('loading')
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(null)
@@ -125,6 +133,13 @@ function App() {
   const [paletteMode, setPaletteMode] = useState<'files' | 'commands'>('files')
   const [sidebarView, setSidebarView] = useState<ActivityBarView>('explorer')
   const [renamingId, setRenamingId] = useState<string | null>(null)
+  const [zenMode, setZenMode] = useState(false)
+  const [bottomPanelTab, setBottomPanelTab] = useState<BottomPanelTab>('terminal')
+  const [terminalOpen, setTerminalOpen] = useState(false)
+  const [terminalHeight, setTerminalHeight] = useState(200)
+  const [problemsOpen, setProblemsOpen] = useState(false)
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; items: ContextMenuItem[] } | null>(null)
+
   const isMobile = useMediaQuery('(max-width: 767px)')
   const paletteOpenRef = useRef(paletteOpen)
   paletteOpenRef.current = paletteOpen
@@ -194,6 +209,9 @@ function App() {
   const handleToggleAutoRefresh = useCallback(() => setAutoRefresh((p) => !p), [])
   const handlePreviewManualRun = useCallback(() => setManualPreviewContent(computePreview()), [computePreview])
 
+  const toggleZenMode = useCallback(() => setZenMode((p) => !p), [])
+  const toggleTerminal = useCallback(() => setTerminalOpen((p) => !p), [])
+
   const allFiles = useMemo(() => {
     const result: FileNode[] = []
     function walk(nodes: FileNode[]) {
@@ -206,15 +224,43 @@ function App() {
     return result
   }, [vfsRoot])
 
+  const recentFiles = useMemo(() => {
+    try {
+      const stored = JSON.parse(localStorage.getItem('indranext-recent-files') || '[]') as { id: string; name: string; time: number }[]
+      return stored.filter(s => flat.has(s.id)).slice(0, 5).map(s => ({ id: s.id, name: s.name }))
+    } catch { return [] }
+  }, [flat, activeFileId])
+
+  const closeContextMenu = useCallback(() => setContextMenu(null), [])
+
+  const onContextMenu = useCallback((e: React.MouseEvent, fileId?: string) => {
+    e.preventDefault()
+    const items: ContextMenuItem[] = []
+    if (fileId) {
+      items.push(
+        { id: 'rename', label: 'Rename', action: () => setRenamingId(fileId) },
+        { id: 'delete', label: 'Delete', action: () => deleteItem(fileId) },
+      )
+      items.push({ id: 'div1', label: '', divider: true, action: () => {} })
+    }
+    items.push(
+      { id: 'new-file', label: 'New File', shortcut: '', action: () => { handleCreateItem(vfsRoot.id, 'file', 'new-file.ts') } },
+      { id: 'new-folder', label: 'New Folder', action: () => { handleCreateItem(vfsRoot.id, 'folder', 'new-folder') } },
+    )
+    setContextMenu({ x: e.clientX, y: e.clientY, items })
+  }, [vfsRoot.id, handleCreateItem, deleteItem])
+
   const commands: Command[] = useMemo(() => [
     { id: 'back', label: 'Go to Dashboard', description: 'Back to project list', category: 'Navigate', action: handleBackToDashboard },
     { id: 'toggle-preview', label: 'Toggle Preview Panel', category: 'View', action: handleTogglePreview },
     { id: 'run-preview', label: 'Run Preview', category: 'View', action: handleRun },
     { id: 'toggle-sidebar', label: 'Toggle Sidebar', category: 'View', action: toggleSidebar },
+    { id: 'toggle-terminal', label: 'Toggle Terminal', category: 'View', action: toggleTerminal },
+    { id: 'zen-mode', label: 'Toggle Zen Mode', category: 'View', action: toggleZenMode },
     { id: 'theme-dark', label: 'Theme: Dark', category: 'Preferences', action: () => setMode('dark') },
     { id: 'theme-light', label: 'Theme: Light', category: 'Preferences', action: () => setMode('light') },
     { id: 'theme-auto', label: 'Theme: Auto', category: 'Preferences', action: () => setMode('auto') },
-  ], [handleBackToDashboard, handleTogglePreview, handleRun, toggleSidebar, setMode])
+  ], [handleBackToDashboard, handleTogglePreview, handleRun, toggleSidebar, toggleTerminal, toggleZenMode, setMode])
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -225,11 +271,23 @@ function App() {
       if ((e.metaKey || e.ctrlKey) && e.key === 'p') {
         e.preventDefault(); setPaletteMode('files'); setPaletteOpen(true); return
       }
+      if ((e.metaKey || e.ctrlKey) && e.key === '`') {
+        e.preventDefault(); toggleTerminal(); return
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault()
+        const handleZ = (ev: KeyboardEvent) => {
+          if (ev.key === 'z') { toggleZenMode(); window.removeEventListener('keyup', handleZ) }
+          else window.removeEventListener('keyup', handleZ)
+        }
+        window.addEventListener('keyup', handleZ)
+        return
+      }
       if (e.key === 'Escape' && paletteOpenRef.current) setPaletteOpen(false)
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [])
+  }, [toggleTerminal, toggleZenMode])
 
   if (screen === 'loading') return <LoadingScreen />
   if (screen === 'login') {
@@ -260,8 +318,11 @@ function App() {
     )
   }
 
+  const bottomOpen = terminalOpen || problemsOpen
+
   return (
-    <div className="flex h-screen flex-col overflow-hidden" style={{ backgroundColor: 'var(--bg-app)' }}>
+    <div className={'flex h-screen flex-col overflow-hidden' + (zenMode ? '' : '')}
+         style={{ backgroundColor: 'var(--bg-app)' }}>
       {syncing && (
         <div className="absolute right-3 top-1 z-50 flex items-center gap-1.5 rounded px-2 py-0.5 text-xs text-white/60"
              style={{ backgroundColor: 'var(--bg-sidebar)' }}>
@@ -273,30 +334,50 @@ function App() {
         </div>
       )}
 
-      <HamburgerButton isOpen={sidebarOpen} onClick={toggleSidebar} />
+      {contextMenu && <ContextMenu x={contextMenu.x} y={contextMenu.y} items={contextMenu.items} onClose={closeContextMenu} />}
 
-      <div className="flex flex-1 overflow-hidden">
-        <ActivityBar activeView={sidebarView} onViewChange={handleViewChange} />
+      {!zenMode && <HamburgerButton isOpen={sidebarOpen} onClick={toggleSidebar} />}
 
-        <Sidebar
-          root={vfsRoot}
-          activeFileId={activeFileId}
-          onFileClick={handleFileClick}
-          onCreateItem={handleCreateItem}
-          onRename={renameItem}
-          onDelete={deleteItem}
-          isOpen={sidebarOpen}
-          view={sidebarView}
-          renamingId={renamingId}
-          onStartRename={setRenamingId}
-        />
+      <div className={'flex flex-1 overflow-hidden' + (zenMode ? '' : '')}>
+        {!zenMode && <ActivityBar activeView={sidebarView} onViewChange={handleViewChange} />}
 
-        {isMobile && sidebarOpen && (
-          <div className="fixed inset-0 z-30" style={{ backgroundColor: 'var(--bg-overlay)' }} onClick={closeSidebar} />
+        {!zenMode && (
+          <Sidebar
+            root={vfsRoot}
+            activeFileId={activeFileId}
+            onFileClick={handleFileClick}
+            onCreateItem={handleCreateItem}
+            onRename={renameItem}
+            onDelete={deleteItem}
+            isOpen={sidebarOpen}
+            view={sidebarView}
+            renamingId={renamingId}
+            onStartRename={setRenamingId}
+            themeMode={themeMode}
+            onThemeChange={setMode}
+            settings={settings}
+            onSettingsChange={updateSettings}
+            onContextMenu={(e, fileId) => {
+              e.preventDefault()
+              const items: ContextMenuItem[] = [
+                { id: 'open', label: 'Open', action: () => openFile(fileId) },
+                { id: 'rename', label: 'Rename', action: () => setRenamingId(fileId) },
+                { id: 'delete', label: 'Delete', action: () => deleteItem(fileId) },
+                { id: 'div1', label: '', divider: true, action: () => {} },
+                { id: 'new-file', label: 'New File', action: () => handleCreateItem(fileId, 'file', 'new-file.ts') },
+                { id: 'new-folder', label: 'New Folder', action: () => handleCreateItem(fileId, 'folder', 'new-folder') },
+              ]
+              setContextMenu({ x: e.clientX, y: e.clientY, items })
+            }}
+          />
+        )}
+
+        {!zenMode && isMobile && sidebarOpen && (
+          <div className="fixed inset-0 z-30 backdrop-blur" style={{ backgroundColor: 'var(--bg-overlay)' }} onClick={closeSidebar} />
         )}
 
         <div className="flex flex-1 flex-col overflow-hidden">
-          {openFiles.length > 0 && !isMobile && (
+          {openFiles.length > 0 && !isMobile && !zenMode && (
             <TabBar
               tabs={openFiles}
               onSelect={handleSelectTab}
@@ -307,17 +388,22 @@ function App() {
             />
           )}
 
-          <Breadcrumbs root={vfsRoot} activeFileId={activeFileId} onNavigate={handleFileClick} />
+          {activeFileId && !zenMode && (
+            <Breadcrumbs root={vfsRoot} activeFileId={activeFileId} onNavigate={handleFileClick} />
+          )}
 
-          <div className="flex flex-1 overflow-hidden">
+          <div className="flex flex-1 overflow-hidden" onContextMenu={(e) => onContextMenu(e)}>
             <EditorArea
               activeTab={activeTab}
               content={activeTab ? flat.get(activeTab.id)?.content ?? '' : ''}
               onChange={handleEditorChange}
               isDark={isDark}
+              recentFiles={recentFiles}
+              onFileSelect={handleFileClick}
+              onCreateFile={handlePaletteCreateFile}
             />
 
-            {previewOpen && !isMobile && (
+            {!zenMode && previewOpen && !isMobile && (
               <div className="w-1/2 min-w-[320px] border-l" style={{ borderColor: 'var(--border)' }}>
                 <LivePreview
                   content={previewContent}
@@ -330,9 +416,56 @@ function App() {
               </div>
             )}
           </div>
+
+          {!zenMode && bottomOpen && (
+            <div className="flex flex-col shrink-0 animate-slide-up"
+                 style={{ maxHeight: `${terminalHeight + 30}px` }}>
+              <div className="flex items-center border-t border-b h-[30px] shrink-0 px-2 text-xs"
+                   style={{ backgroundColor: 'var(--bg-sidebar)', borderColor: 'var(--border)' }}>
+                <button onClick={() => setBottomPanelTab('terminal')}
+                  className="flex items-center gap-1.5 px-3 h-full transition-colors"
+                  style={{
+                    color: bottomPanelTab === 'terminal' ? 'var(--text-primary)' : 'var(--text-dim)',
+                    borderBottom: bottomPanelTab === 'terminal' ? '2px solid var(--accent)' : '2px solid transparent',
+                  }}>
+                  <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
+                    <path d="M2 2v12h4V2H2zm1 1h2v3H3V3zm0 4h2v7H3V7zm5-5v12h4V2H8zm1 1h2v7H9V3zm0 8h2v3H9v-3zm5-5v9h4V6h-4zm1 1h2v7h-2V7zm0 8h2v2h-2v-2z" />
+                  </svg>
+                  TERMINAL
+                </button>
+                <button onClick={() => setBottomPanelTab('problems')}
+                  className="flex items-center gap-1.5 px-3 h-full transition-colors"
+                  style={{
+                    color: bottomPanelTab === 'problems' ? 'var(--text-primary)' : 'var(--text-dim)',
+                    borderBottom: bottomPanelTab === 'problems' ? '2px solid var(--accent)' : '2px solid transparent',
+                  }}>
+                  <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
+                    <path d="M8 1L1 14h14L8 1zm0 3.5h1v4.5H8V4.5zm0 6h1v1.5H8V10.5z" />
+                  </svg>
+                  PROBLEMS
+                </button>
+                <div className="flex-1" />
+                <button onClick={() => { setTerminalOpen(false); setProblemsOpen(false) }}
+                  className="size-6 flex items-center justify-center rounded hover:bg-[var(--bg-hover)] transition-colors"
+                  style={{ color: 'var(--text-dim)' }}>
+                  <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
+                    <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.5" />
+                  </svg>
+                </button>
+              </div>
+              <div className="flex-1 overflow-hidden">
+                {bottomPanelTab === 'terminal' && (
+                  <TerminalPanel visible={true} height={terminalHeight} onResize={setTerminalHeight} />
+                )}
+                {bottomPanelTab === 'problems' && (
+                  <ProblemsPanel visible={true} />
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
-        {openFiles.length > 0 && isMobile && (
+        {!zenMode && openFiles.length > 0 && isMobile && (
           <TabBar
             tabs={openFiles}
             onSelect={handleSelectTab}
@@ -344,7 +477,7 @@ function App() {
         )}
       </div>
 
-      {previewOpen && isMobile && (
+      {!zenMode && previewOpen && isMobile && (
         <div className="fixed inset-0 z-50 flex flex-col" style={{ backgroundColor: 'var(--bg-app)' }}>
           <LivePreview
             content={previewContent}
@@ -357,20 +490,28 @@ function App() {
         </div>
       )}
 
-      <StatusBar
-        tabName={activeTab?.name}
-        language={activeTab ? getLanguage(activeTab.name) : undefined}
-        themeMode={themeMode}
-        onThemeToggle={toggleTheme}
-      >
-        <button onClick={handleBackToDashboard}
-          className="flex items-center gap-1 text-white/70 hover:text-white transition-colors">
-          <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
-            <path d="M2 1h5v5H2V1zm7 0h5v5H9V1zM2 8h5v5H2V8zm7 0h5v5H9V8z" />
-          </svg>
-          Projects
-        </button>
-      </StatusBar>
+      {!zenMode && (
+        <StatusBar
+          tabName={activeTab?.name}
+          language={activeTab ? getLanguage(activeTab.name) : undefined}
+          themeMode={themeMode}
+          onThemeToggle={toggleTheme}
+        >
+          <button onClick={handleBackToDashboard}
+            className="flex items-center gap-1 text-white/70 hover:text-white transition-colors">
+            <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
+              <path d="M2 1h5v5H2V1zm7 0h5v5H9V1zM2 8h5v5H2V8zm7 0h5v5H9V8z" />
+            </svg>
+            Projects
+          </button>
+          <button onClick={toggleTerminal} className="flex items-center gap-1 text-white/70 hover:text-white transition-colors ml-2">
+            <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
+              <path d="M2 2v12h4V2H2zm1 1h2v3H3V3zm0 4h2v7H3V7zm5-5v12h4V2H8zm1 1h2v7H9V3zm0 8h2v3H9v-3zm5-5v9h4V6h-4zm1 1h2v7h-2V7zm0 8h2v2h-2v-2z" />
+            </svg>
+            Terminal
+          </button>
+        </StatusBar>
+      )}
 
       <CommandPalette
         isOpen={paletteOpen}
