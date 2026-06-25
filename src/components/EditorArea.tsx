@@ -3,6 +3,7 @@ import Editor, { type BeforeMount, type OnMount } from '@monaco-editor/react'
 import type { TabItem } from '../types'
 import { emmetHTML, emmetCSS, emmetJSX } from 'emmet-monaco-es'
 import { updateProblems } from './ProblemsPanel'
+import MarkdownPreview from './MarkdownPreview'
 
 import type { RecentProject } from '../types'
 
@@ -23,6 +24,8 @@ interface EditorAreaProps {
   fsActive?: boolean
   folderName?: string
   recentProjects?: RecentProject[]
+  goToLine?: number
+  onGoToLineHandled?: () => void
 }
 
 const RECENT_KEY = 'indranext-recent-files'
@@ -78,8 +81,9 @@ const baseEditorOptions = {
   contextmenu: true,
 }
 
-function EditorArea({ activeTab, content, onChange, isDark = true, isMobile = false, recentFiles = [], onFileSelect, onCreateFile, onCursorChange, onSave, onMonacoCommand, onOpenFolder, fsSupported, fsActive, folderName, recentProjects = [] }: EditorAreaProps) {
+function EditorArea({ activeTab, content, onChange, isDark = true, isMobile = false, recentFiles = [], onFileSelect, onCreateFile, onCursorChange, onSave, onMonacoCommand, onOpenFolder, fsSupported, fsActive, folderName, recentProjects = [], goToLine, onGoToLineHandled }: EditorAreaProps) {
   const [showTemplates, setShowTemplates] = useState(false)
+  const [mdPreview, setMdPreview] = useState(true)
   const editorRef = useRef<Parameters<OnMount>[0] | null>(null)
   const monacoRef = useRef<typeof import('monaco-editor') | null>(null)
 
@@ -88,6 +92,16 @@ function EditorArea({ activeTab, content, onChange, isDark = true, isMobile = fa
     minimap: { enabled: !isMobile, size: 'proportional' as const, maxColumn: 60, showSlider: 'mouseover' as const },
     fontSize: isMobile ? 11 : 13,
   }), [isMobile])
+
+  useEffect(() => {
+    if (!goToLine || !editorRef.current) return
+    const editor = editorRef.current
+    const line = Math.min(goToLine, editor.getModel()?.getLineCount() ?? goToLine)
+    editor.revealLineInCenter(line)
+    editor.setPosition({ lineNumber: line, column: 1 })
+    editor.focus()
+    onGoToLineHandled?.()
+  }, [goToLine, onGoToLineHandled])
 
   useEffect(() => {
     if (activeTab) {
@@ -394,29 +408,80 @@ function EditorArea({ activeTab, content, onChange, isDark = true, isMobile = fa
     )
   }
 
+  const isMarkdown = activeTab?.name.endsWith('.md') ?? false
+  const showMdPreview = isMarkdown && mdPreview
+
   return (
     <div className="flex flex-1 overflow-hidden" style={{ backgroundColor: 'var(--bg-app)' }}>
-      <Editor
-        key={activeTab.id}
-        theme={themeName}
-        language={getLanguage(activeTab.name)}
-        value={content}
-        onChange={onChange}
-        beforeMount={handleBeforeMount}
-        onMount={handleMount}
-        options={editorOptions}
-        loading={
-          <div className="flex h-full items-center justify-center" style={{ color: 'var(--text-dim)' }}>
-            <div className="flex items-center gap-2">
+      {showMdPreview && (
+        <div className="relative flex-1 flex flex-col border-r" style={{ borderColor: 'var(--border)' }}>
+          <div className="flex items-center justify-between px-2 h-[30px] shrink-0 border-b text-xs"
+               style={{ borderColor: 'var(--border)', backgroundColor: 'var(--bg-sidebar)' }}>
+            <span style={{ color: 'var(--text-dim)' }}>Editor</span>
+            <button onClick={() => setMdPreview(false)}
+              className="text-xs px-2 py-0.5 rounded" style={{ color: 'var(--text-dim)', backgroundColor: 'rgba(255,255,255,0.05)' }}>
+              Preview only
+            </button>
+          </div>
+          <div className="flex-1 overflow-hidden">
+            <Editor
+              key={activeTab.id}
+              theme={themeName}
+              language={getLanguage(activeTab.name)}
+              value={content}
+              onChange={onChange}
+              beforeMount={handleBeforeMount}
+              onMount={handleMount}
+              options={editorOptions}
+              loading={
+                <div className="flex h-full items-center justify-center" style={{ color: 'var(--text-dim)' }}>
+                  <svg className="animate-spin" width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                    <path d="M8 0a8 8 0 110 16A8 8 0 018 0zm0 2a6 6 0 100 12A6 6 0 008 2z" opacity="0.3" />
+                    <path d="M8 0a8 8 0 018 8h-2a6 6 0 00-6-6V0z" />
+                  </svg>
+                  Loading editor...
+                </div>
+              }
+            />
+          </div>
+        </div>
+      )}
+      {!showMdPreview && (
+        <Editor
+          key={activeTab.id}
+          theme={themeName}
+          language={getLanguage(activeTab.name)}
+          value={content}
+          onChange={onChange}
+          beforeMount={handleBeforeMount}
+          onMount={handleMount}
+          options={editorOptions}
+          loading={
+            <div className="flex h-full items-center justify-center" style={{ color: 'var(--text-dim)' }}>
               <svg className="animate-spin" width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
                 <path d="M8 0a8 8 0 110 16A8 8 0 018 0zm0 2a6 6 0 100 12A6 6 0 008 2z" opacity="0.3" />
                 <path d="M8 0a8 8 0 018 8h-2a6 6 0 00-6-6V0z" />
               </svg>
               Loading editor...
             </div>
+          }
+        />
+      )}
+      {showMdPreview && (
+        <div className="relative flex-1 flex flex-col">
+          <div className="flex items-center justify-between px-2 h-[30px] shrink-0 border-b text-xs"
+               style={{ borderColor: 'var(--border)', backgroundColor: 'var(--bg-sidebar)' }}>
+            <span style={{ color: 'var(--text-dim)' }}>Preview</span>
+            <button onClick={() => setMdPreview(false)}
+              className="text-xs px-2 py-0.5 rounded" style={{ color: 'var(--text-dim)', backgroundColor: 'rgba(255,255,255,0.05)' }}>
+              Editor only
+            </button>
           </div>
-        }
-      />
+          <div className="flex-1 overflow-hidden">
+            <MarkdownPreview content={content} />
+          </div>
+        </div>
+      )}
     </div>
   )
 }

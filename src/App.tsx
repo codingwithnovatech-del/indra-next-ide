@@ -189,6 +189,7 @@ function App() {
   const [cursor, setCursor] = useState<{ line: number; col: number; tabSize: number }>({ line: 1, col: 1, tabSize: 2 })
   const [previewRefreshKey, setPreviewRefreshKey] = useState(0)
   const [turnstilePassed, setTurnstilePassed] = useState(() => sessionStorage.getItem('cf-turnstile') === '1')
+  const [goToLine, setGoToLine] = useState(0)
 
   const handleTurnstileSuccess = useCallback(() => {
     sessionStorage.setItem('cf-turnstile', '1')
@@ -202,6 +203,8 @@ function App() {
   isIDERef.current = isIDE
 
   const activeTab = openFiles.find((t) => t.isActive)
+  const activeFileContent = activeFileId ? flat.get(activeFileId)?.content : undefined
+  const activeFileLang = activeTab ? getLanguage(activeTab.name) : undefined
 
   const computePreview = useCallback(() => bundleForPreview(activeFileId, flat), [activeFileId, flat])
 
@@ -312,12 +315,25 @@ function App() {
     renameItem(id, name)
   }, [renameItem, fsa])
 
+  const handleReplace = useCallback((fileId: string, query: string, replacement: string) => {
+    const node = flat.get(fileId)
+    if (!node || node.content === undefined) return
+    const flags = typeof query === 'string' ? 'g' : 'g'
+    const regex = new RegExp(query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), flags)
+    const newContent = node.content.replace(regex, replacement)
+    updateContent(fileId, newContent)
+    showToast(`Replaced in ${node.name}`, 'success')
+  }, [flat, updateContent])
+
   const handleClosePreview = useCallback(() => setPreviewOpen(false), [])
   const handleToggleAutoRefresh = useCallback(() => setAutoRefresh((p) => !p), [])
   const handlePreviewManualRun = useCallback(() => setManualPreviewContent(computePreview()), [computePreview])
 
   const toggleZenMode = useCallback(() => setZenMode((p) => !p), [])
   const toggleTerminal = useCallback(() => setTerminalOpen((p) => !p), [])
+
+  const handleLineClick = useCallback((line: number) => setGoToLine(line), [])
+  const handleGoToLineHandled = useCallback(() => setGoToLine(0), [])
 
   const handleMonacoCommand = useCallback((cmd: string) => {
     if (cmd === 'palette') { setPaletteMode('commands'); setPaletteOpen(true); return }
@@ -497,6 +513,10 @@ function App() {
             fsSupported={fsa.isSupported}
             fsActive={fsa.isActive}
             folderName={fsa.folderName}
+            onReplace={handleReplace}
+            activeFileContent={activeFileContent}
+            activeFileLang={activeFileLang}
+            onLineClick={handleLineClick}
             onContextMenu={(e, fileId) => {
               e.preventDefault()
               const node = flat.get(fileId)
@@ -553,6 +573,8 @@ function App() {
               fsActive={fsa.isActive}
               folderName={fsa.folderName}
               recentProjects={fsa.getRecentProjects()}
+              goToLine={goToLine}
+              onGoToLineHandled={handleGoToLineHandled}
             />
 
             {!zenMode && !isMobile && splitFileId && (
@@ -584,6 +606,8 @@ function App() {
                   fsActive={fsa.isActive}
                   folderName={fsa.folderName}
                   recentProjects={fsa.getRecentProjects()}
+                  goToLine={goToLine}
+                  onGoToLineHandled={handleGoToLineHandled}
                 />
               </div>
             )}

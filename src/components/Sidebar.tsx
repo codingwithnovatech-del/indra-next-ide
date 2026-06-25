@@ -6,6 +6,7 @@ import GitPanel from './GitPanel'
 import SnippetsPanel from './SnippetsPanel'
 import HelpPanel from './HelpPanel'
 import AIPanel from './AIPanel'
+import OutlinePanel from './OutlinePanel'
 import type { FileNode } from '../types'
 import type { ActivityBarView } from './ActivityBar'
 import type { ThemeMode } from '../hooks/useTheme'
@@ -33,6 +34,10 @@ interface SidebarProps {
   fsSupported?: boolean
   fsActive?: boolean
   folderName?: string
+  onReplace?: (fileId: string, query: string, replacement: string) => void
+  activeFileContent?: string
+  activeFileLang?: string
+  onLineClick?: (line: number) => void
 }
 
 function Sidebar({
@@ -57,6 +62,10 @@ function Sidebar({
   fsSupported,
   fsActive,
   folderName,
+  onReplace,
+  activeFileContent,
+  activeFileLang,
+  onLineClick,
 }: SidebarProps) {
   const handleCreateChild = useCallback(
     (parentId: string, type: 'file' | 'folder') => {
@@ -166,11 +175,23 @@ function Sidebar({
               </div>
             )}
           </div>
+
+          {activeFileContent && activeFileLang && (
+            <>
+              <div className="flex items-center px-3 h-[26px] text-[10px] font-semibold uppercase tracking-wider select-none border-t"
+                   style={{ color: 'var(--text-muted)', borderColor: 'var(--border)' }}>
+                <span>Outline</span>
+              </div>
+              <div className="overflow-y-auto max-h-[40%]">
+                <OutlinePanel content={activeFileContent} language={activeFileLang} onLineClick={onLineClick} />
+              </div>
+            </>
+          )}
         </>
       )}
 
       {view === 'search' && (
-        <SearchPanel root={root} onFileClick={onFileClick} onClose={() => onStartRename(null)} />
+        <SearchPanel root={root} onFileClick={onFileClick} onClose={() => onStartRename(null)} onReplace={onReplace} />
       )}
 
       {view === 'git' && (
