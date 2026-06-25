@@ -240,6 +240,13 @@ function App() {
   const toggleZenMode = useCallback(() => setZenMode((p) => !p), [])
   const toggleTerminal = useCallback(() => setTerminalOpen((p) => !p), [])
 
+  const handleMonacoCommand = useCallback((cmd: string) => {
+    if (cmd === 'palette') { setPaletteMode('commands'); setPaletteOpen(true); return }
+    if (cmd === 'quickOpen') { setPaletteMode('files'); setPaletteOpen(true); return }
+    if (cmd === 'terminal') { toggleTerminal(); return }
+    if (cmd === 'sidebar') { toggleSidebar(); return }
+  }, [toggleTerminal, toggleSidebar])
+
   const allFiles = useMemo(() => {
     const result: FileNode[] = []
     function walk(nodes: FileNode[]) {
@@ -451,6 +458,8 @@ function App() {
               onFileSelect={handleFileClick}
               onCreateFile={handlePaletteCreateFile}
               onCursorChange={(line, col, tabSize) => setCursor({ line, col, tabSize })}
+              onSave={handleSave}
+              onMonacoCommand={handleMonacoCommand}
             />
 
             {!zenMode && !isMobile && splitFileId && (
@@ -475,6 +484,8 @@ function App() {
                   onFileSelect={handleFileClick}
                   onCreateFile={handlePaletteCreateFile}
                   onCursorChange={(line, col, tabSize) => setCursor({ line, col, tabSize })}
+                  onSave={handleSave}
+                  onMonacoCommand={handleMonacoCommand}
                 />
               </div>
             )}

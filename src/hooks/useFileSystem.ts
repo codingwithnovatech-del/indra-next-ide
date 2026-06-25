@@ -73,6 +73,10 @@ export function useFileSystem(workspaceId = 'default') {
 
   const openFileIdsRef = useRef(openFileIds)
   openFileIdsRef.current = openFileIds
+  const rootRef = useRef(root)
+  rootRef.current = root
+  const activeFileIdRef = useRef(activeFileId)
+  activeFileIdRef.current = activeFileId
 
   const flat = useMemo(() => flattenTree(root), [root])
 
@@ -126,9 +130,16 @@ export function useFileSystem(workspaceId = 'default') {
     setDirtyFiles((prev) => {
       const next = new Set(prev)
       next.delete(id)
+      if (next.size === 0) {
+        saveSession(storageKey, {
+          root: rootRef.current,
+          openFileIds: openFileIdsRef.current,
+          activeFileId: activeFileIdRef.current,
+        } satisfies SessionData)
+      }
       return next
     })
-  }, [])
+  }, [storageKey])
 
   const isDirty = useCallback((id: string) => dirtyFiles.has(id), [dirtyFiles])
 

@@ -14,6 +14,8 @@ interface EditorAreaProps {
   onFileSelect?: (id: string) => void
   onCreateFile?: (name: string) => void
   onCursorChange?: (line: number, col: number, tabSize: number) => void
+  onSave?: () => void
+  onMonacoCommand?: (cmd: string) => void
 }
 
 const RECENT_KEY = 'indranext-recent-files'
@@ -69,7 +71,7 @@ const baseEditorOptions = {
   contextmenu: true,
 }
 
-function EditorArea({ activeTab, content, onChange, isDark = true, isMobile = false, recentFiles = [], onFileSelect, onCreateFile, onCursorChange }: EditorAreaProps) {
+function EditorArea({ activeTab, content, onChange, isDark = true, isMobile = false, recentFiles = [], onFileSelect, onCreateFile, onCursorChange, onSave, onMonacoCommand }: EditorAreaProps) {
   const [showTemplates, setShowTemplates] = useState(false)
   const editorRef = useRef<Parameters<OnMount>[0] | null>(null)
   const monacoRef = useRef<typeof import('monaco-editor') | null>(null)
@@ -192,8 +194,33 @@ function EditorArea({ activeTab, content, onChange, isDark = true, isMobile = fa
       editor.getModel()?.getOptions().tabSize ?? 2,
     )
 
-    return () => { disposable.dispose(); cursorDisposable.dispose() }
-  }, [onCursorChange])
+    const disposables: { dispose: () => void }[] = [disposable, cursorDisposable]
+
+    disposables.push(
+      editor.addAction({
+        id: 'indra.save', label: 'Save', keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS],
+        run: () => onSave?.(),
+      }),
+      editor.addAction({
+        id: 'indra.palette', label: 'Command Palette', keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.KeyP],
+        run: () => onMonacoCommand?.('palette'),
+      }),
+      editor.addAction({
+        id: 'indra.quickOpen', label: 'Quick Open', keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyP],
+        run: () => onMonacoCommand?.('quickOpen'),
+      }),
+      editor.addAction({
+        id: 'indra.terminal', label: 'Toggle Terminal', keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.Backquote],
+        run: () => onMonacoCommand?.('terminal'),
+      }),
+      editor.addAction({
+        id: 'indra.sidebar', label: 'Toggle Sidebar', keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyB],
+        run: () => onMonacoCommand?.('sidebar'),
+      }),
+    )
+
+    return () => disposables.forEach(d => d.dispose())
+  }, [onCursorChange, onSave, onMonacoCommand])
 
   const themeName = isDark ? 'indra-dark' : 'indra-light'
 
