@@ -455,8 +455,8 @@ function App() {
               Skip → Continue as Guest
             </button>
             <LoginPage
-              onSignIn={(email, pwd) => { signIn(email, pwd); setShowLoginModal(false) }}
-              onSignUp={(email, pwd, name) => { signUp(email, pwd, name); setShowLoginModal(false) }}
+              onSignIn={(email, pwd, captchaToken) => { signIn(email, pwd, captchaToken); setShowLoginModal(false) }}
+              onSignUp={(email, pwd, name, captchaToken) => { signUp(email, pwd, name, captchaToken); setShowLoginModal(false) }}
               onSignInWithOAuth={(provider) => signInWithOAuth(provider)}
               error={authError}
               message={authMessage}

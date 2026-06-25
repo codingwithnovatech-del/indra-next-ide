@@ -4,20 +4,6 @@ interface TurnstileChallengeProps {
   onSuccess: () => void
 }
 
-declare global {
-  interface Window {
-    turnstile?: {
-      render: (container: string | HTMLElement, options: {
-        sitekey: string
-        callback: (token: string) => void
-        theme?: string
-      }) => string
-      reset: (widgetId: string) => void
-      remove: (widgetId: string) => void
-    }
-  }
-}
-
 const SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY || '0x4AAAAAADq-bbzZnWnGtK6F'
 
 function TurnstileChallenge({ onSuccess }: TurnstileChallengeProps) {

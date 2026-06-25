@@ -1,9 +1,10 @@
 import { memo, useState, useEffect, useRef } from 'react'
 import type { ThemeMode } from '../hooks/useTheme'
+import TurnstileWidget from './TurnstileWidget'
 
 interface LoginPageProps {
-  onSignIn: (email: string, password: string) => void
-  onSignUp: (email: string, password: string, name: string) => void
+  onSignIn: (email: string, password: string, captchaToken?: string) => void
+  onSignUp: (email: string, password: string, name: string, captchaToken?: string) => void
   onSignInWithOAuth?: (provider: 'github' | 'google') => void
   error: string | null
   message?: string | null
@@ -18,6 +19,8 @@ function LoginPage({ onSignIn, onSignUp, onSignInWithOAuth, error, message, setE
   const [password, setPassword] = useState('')
   const [name, setName] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null)
+  const captchaKeyRef = useRef(0)
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -30,12 +33,17 @@ function LoginPage({ onSignIn, onSignUp, onSignInWithOAuth, error, message, setE
     if (isSignUp && !name.trim()) return
     setSubmitting(true)
     try {
-      if (isSignUp) await onSignUp(email.trim(), password, name.trim())
-      else await onSignIn(email.trim(), password)
+      if (isSignUp) await onSignUp(email.trim(), password, name.trim(), captchaToken || undefined)
+      else await onSignIn(email.trim(), password, captchaToken || undefined)
     } finally {
       setSubmitting(false)
+      setCaptchaToken(null)
+      captchaKeyRef.current++
     }
   }
+
+  const handleCaptchaVerify = (token: string) => setCaptchaToken(token)
+  const handleCaptchaExpire = () => setCaptchaToken(null)
 
   return (
     <div className="relative flex min-h-screen flex-col items-center justify-center px-4 overflow-hidden"
@@ -129,7 +137,11 @@ function LoginPage({ onSignIn, onSignUp, onSignInWithOAuth, error, message, setE
             <div className="flex-1 h-px" style={{ backgroundColor: 'var(--border)' }} />
           </div>
 
-          <button type="submit" disabled={submitting}
+          <div className="flex justify-center">
+            <TurnstileWidget key={captchaKeyRef.current} onVerify={handleCaptchaVerify} onExpire={handleCaptchaExpire} theme={themeMode === 'dark' ? 'dark' : 'light'} />
+          </div>
+
+          <button type="submit" disabled={submitting || !captchaToken}
             className="w-full h-[44px] rounded-lg text-sm font-medium text-white transition-all duration-200 hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2"
             style={{ backgroundColor: 'var(--accent)' }}>
             {submitting && (

@@ -30,18 +30,18 @@ export function useAuth() {
     return () => { cancelled = true; listener?.subscription.unsubscribe() }
   }, [])
 
-  const signUp = useCallback(async (email: string, password: string, name: string) => {
+  const signUp = useCallback(async (email: string, password: string, name: string, captchaToken?: string) => {
     setError(null)
     setMessage(null)
-    const { error } = await supabase.auth.signUp({ email, password, options: { data: { name } } })
+    const { error } = await supabase.auth.signUp({ email, password, options: { data: { name }, captchaToken } })
     if (error) setError(error.message)
     else setMessage('Check your email for the confirmation link.')
   }, [])
 
-  const signIn = useCallback(async (email: string, password: string) => {
+  const signIn = useCallback(async (email: string, password: string, captchaToken?: string) => {
     setError(null)
     setMessage(null)
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    const { error } = await supabase.auth.signInWithPassword({ email, password, options: { captchaToken } })
     if (error) setError(error.message)
   }, [])
 
