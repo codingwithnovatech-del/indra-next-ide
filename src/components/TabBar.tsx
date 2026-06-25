@@ -1,5 +1,6 @@
 import { memo, useRef, useState, useCallback, useEffect } from 'react'
 import type { TabItem } from '../types'
+import { getFileIcon } from '../utils/fileIcons'
 
 interface TabBarProps {
   tabs: TabItem[]
@@ -101,8 +102,8 @@ function TabBar({ tabs, onSelect, onClose, onRun, isPreviewOpen, onTogglePreview
             {tab.isActive && (
               <span className="absolute inset-x-0 top-0 h-[2px]" style={{ backgroundColor: 'var(--accent)' }} />
             )}
-            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" className="shrink-0 text-[#519aba]">
-              <path d="M1 2.5A1.5 1.5 0 012.5 1h3.207a1.5 1.5 0 011.06.44l3.754 3.753a1.5 1.5 0 01.44 1.06V13.5a1.5 1.5 0 01-1.5 1.5h-7A1.5 1.5 0 011 13.5V2.5z" />
+            <svg width="14" height="14" viewBox="0 0 16 16" fill={getFileIcon(tab.name).color} className="shrink-0">
+              <path d={getFileIcon(tab.name).icon} />
             </svg>
             <span className="truncate max-w-[120px]">{tab.name}</span>
             <button

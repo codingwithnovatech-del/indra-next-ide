@@ -4,6 +4,8 @@ import SearchPanel from './SearchPanel'
 import SettingsPanel from './SettingsPanel'
 import GitPanel from './GitPanel'
 import SnippetsPanel from './SnippetsPanel'
+import HelpPanel from './HelpPanel'
+import AIPanel from './AIPanel'
 import type { FileNode } from '../types'
 import type { ActivityBarView } from './ActivityBar'
 import type { ThemeMode } from '../hooks/useTheme'
@@ -162,6 +164,8 @@ function Sidebar({
           onSettingsChange={onSettingsChange}
         />
       )}
+      {view === 'help' && <HelpPanel />}
+      {view === 'ai' && <AIPanel />}
     </aside>
   )
 }

@@ -6,12 +6,15 @@ interface StatusBarProps {
   language?: string
   themeMode: ThemeMode
   onThemeToggle: () => void
+  line?: number
+  col?: number
+  tabSize?: number
   children?: React.ReactNode
 }
 
 const themeLabel: Record<ThemeMode, string> = { dark: 'Dark', light: 'Light', auto: 'Auto' }
 
-function StatusBar({ tabName, language, themeMode, onThemeToggle, children }: StatusBarProps) {
+function StatusBar({ tabName, language, themeMode, onThemeToggle, line, col, tabSize, children }: StatusBarProps) {
   return (
     <footer className="flex h-[24px] shrink-0 items-center px-3 text-xs text-white select-none"
             style={{ backgroundColor: 'var(--bg-statusbar)' }}>
@@ -33,8 +36,8 @@ function StatusBar({ tabName, language, themeMode, onThemeToggle, children }: St
           </svg>
           {themeLabel[themeMode]}
         </button>
-        <span>Ln 1, Col 1</span>
-        <span>Spaces: 2</span>
+        <span>Ln {line ?? 1}, Col {col ?? 1}</span>
+        <span>Spaces: {tabSize ?? 2}</span>
         <span>UTF-8</span>
         {language && <span>{language}</span>}
         {tabName && <span className="text-white/70">{tabName}</span>}

@@ -20,7 +20,6 @@ import type { Command } from './components/CommandPalette'
 import StatusBar from './components/StatusBar'
 import LoginPage from './components/LoginPage'
 import Dashboard from './components/Dashboard'
-import LoadingScreen from './components/LoadingScreen'
 import ContextMenu from './components/ContextMenu'
 import type { ContextMenuItem } from './components/ContextMenu'
 import TerminalPanel from './components/TerminalPanel'
@@ -46,18 +45,13 @@ function getLanguage(filename: string): string {
 }
 
 function App() {
-  const { session, user, loading: authLoading, error: authError, message: authMessage, signUp, signIn, signOut, setError: setAuthError } = useAuth()
+  const { session, user, error: authError, message: authMessage, signUp, signIn, signInWithOAuth, signOut, setError: setAuthError } = useAuth()
   const { mode: themeMode, toggleTheme, setMode, isDark } = useTheme()
   const { settings, updateSettings } = useSettings()
 
-  const [screen, setScreen] = useState<Screen>('loading')
+  const [screen, setScreen] = useState<Screen>('ide')
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(null)
-
-  useEffect(() => {
-    if (authLoading) { setScreen('loading'); return }
-    if (!session) { setScreen('login'); return }
-    setScreen('dashboard')
-  }, [authLoading, session])
+  const [showLoginModal, setShowLoginModal] = useState(false)
 
   const { projects, loading: projectsLoading, error: projectsError, createProject, deleteProject } = useCloudProjects(user)
   const { syncing, loadSnapshot, saveSnapshot } = useCloudSync()
@@ -76,13 +70,15 @@ function App() {
   }, [createProject])
 
   const handleBackToDashboard = useCallback(() => {
+    if (!session) { setShowLoginModal(true); return }
     setCurrentProjectId(null)
     setScreen('dashboard')
-  }, [])
+  }, [session])
 
   const handleSignOut = useCallback(async () => {
     await signOut()
     setCurrentProjectId(null)
+    setScreen('ide')
   }, [signOut])
 
   const isIDE = screen === 'ide'
@@ -141,6 +137,8 @@ function App() {
   const [problemsOpen, setProblemsOpen] = useState(false)
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; items: ContextMenuItem[] } | null>(null)
   const [splitFileId, setSplitFileId] = useState<string | null>(null)
+  const [cursor, setCursor] = useState<{ line: number; col: number; tabSize: number }>({ line: 1, col: 1, tabSize: 2 })
+  const [previewRefreshKey, setPreviewRefreshKey] = useState(0)
 
   const isMobile = useMediaQuery('(max-width: 767px)')
   const paletteOpenRef = useRef(paletteOpen)
@@ -156,7 +154,7 @@ function App() {
     if (!previewOpen) return ''
     if (autoRefresh) return computePreview()
     return manualPreviewContent
-  }, [previewOpen, autoRefresh, computePreview, manualPreviewContent])
+  }, [previewOpen, autoRefresh, computePreview, manualPreviewContent, previewRefreshKey])
 
   const handleSplitEditor = useCallback((fileId: string) => {
     setSplitFileId((prev) => prev === fileId ? null : fileId)
@@ -169,6 +167,7 @@ function App() {
   const handleRun = useCallback(() => {
     setManualPreviewContent(computePreview())
     setPreviewOpen(true)
+    setPreviewRefreshKey(prev => prev + 1)
   }, [computePreview])
 
   const handleTogglePreview = useCallback(() => {
@@ -282,12 +281,12 @@ function App() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [toggleTerminal, toggleZenMode])
 
-  if (screen === 'loading') return <LoadingScreen />
   if (screen === 'login') {
     return (
       <LoginPage
         onSignIn={signIn}
         onSignUp={signUp}
+        onSignInWithOAuth={signInWithOAuth}
         error={authError}
         message={authMessage}
         setError={setAuthError}
@@ -324,6 +323,27 @@ function App() {
             <path d="M8 0a8 8 0 018 8h-2a6 6 0 00-6-6V0z" />
           </svg>
           Syncing
+        </div>
+      )}
+
+      {showLoginModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ backgroundColor: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)' }}>
+          <div className="relative max-w-sm w-full">
+            <button onClick={() => setShowLoginModal(false)}
+              className="absolute -top-10 right-0 text-sm text-white/70 hover:text-white transition-colors">
+              Skip → Continue as Guest
+            </button>
+            <LoginPage
+              onSignIn={(email, pwd) => { signIn(email, pwd); setShowLoginModal(false) }}
+              onSignUp={(email, pwd, name) => { signUp(email, pwd, name); setShowLoginModal(false) }}
+              onSignInWithOAuth={(provider) => signInWithOAuth(provider)}
+              error={authError}
+              message={authMessage}
+              setError={setAuthError}
+              themeMode={themeMode}
+              onToggleTheme={toggleTheme}
+            />
+          </div>
         </div>
       )}
 
@@ -397,6 +417,7 @@ function App() {
               recentFiles={recentFiles}
               onFileSelect={handleFileClick}
               onCreateFile={handlePaletteCreateFile}
+              onCursorChange={(line, col, tabSize) => setCursor({ line, col, tabSize })}
             />
 
             {!zenMode && splitFileId && (
@@ -419,6 +440,7 @@ function App() {
                   recentFiles={recentFiles}
                   onFileSelect={handleFileClick}
                   onCreateFile={handlePaletteCreateFile}
+                  onCursorChange={(line, col, tabSize) => setCursor({ line, col, tabSize })}
                 />
               </div>
             )}
@@ -432,6 +454,7 @@ function App() {
                   onClose={handleClosePreview}
                   onToggleAutoRefresh={handleToggleAutoRefresh}
                   onRun={handlePreviewManualRun}
+                  refreshKey={previewRefreshKey}
                 />
               </div>
             )}
@@ -507,6 +530,7 @@ function App() {
             onClose={handleClosePreview}
             onToggleAutoRefresh={handleToggleAutoRefresh}
             onRun={handlePreviewManualRun}
+            refreshKey={previewRefreshKey}
           />
         </div>
       )}
@@ -517,14 +541,32 @@ function App() {
           language={activeTab ? getLanguage(activeTab.name) : undefined}
           themeMode={themeMode}
           onThemeToggle={toggleTheme}
+          line={cursor.line}
+          col={cursor.col}
+          tabSize={cursor.tabSize}
         >
-          <button onClick={handleBackToDashboard}
-            className="flex items-center gap-1 text-white/70 hover:text-white transition-colors">
-            <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
-              <path d="M2 1h5v5H2V1zm7 0h5v5H9V1zM2 8h5v5H2V8zm7 0h5v5H9V8z" />
-            </svg>
-            Projects
-          </button>
+          {session ? (
+            <span className="flex items-center gap-1 text-[#4ec9b0] ml-2 text-[10px]">● Cloud Sync</span>
+          ) : (
+            <span className="flex items-center gap-1 text-[#e0a800] ml-2 text-[10px]">● Guest (Local)</span>
+          )}
+          {session ? (
+            <button onClick={handleBackToDashboard}
+              className="flex items-center gap-1 text-white/70 hover:text-white transition-colors ml-2">
+              <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
+                <path d="M2 1h5v5H2V1zm7 0h5v5H9V1zM2 8h5v5H2V8zm7 0h5v5H9V8z" />
+              </svg>
+              Projects
+            </button>
+          ) : (
+            <button onClick={() => setShowLoginModal(true)}
+              className="flex items-center gap-1 text-white/70 hover:text-white transition-colors ml-2">
+              <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
+                <path d="M8 1a3 3 0 100 6 3 3 0 000-6zM2 13c0 2 2.5 3 6 3s6-1 6-3c0-2-2.5-3-6-3s-6 1-6 3z" />
+              </svg>
+              Sign In
+            </button>
+          )}
           <button onClick={toggleTerminal} className="flex items-center gap-1 text-white/70 hover:text-white transition-colors ml-2">
             <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
               <path d="M2 2v12h4V2H2zm1 1h2v3H3V3zm0 4h2v7H3V7zm5-5v12h4V2H8zm1 1h2v7H9V3zm0 8h2v3H9v-3zm5-5v9h4V6h-4zm1 1h2v7h-2V7zm0 8h2v2h-2v-2z" />

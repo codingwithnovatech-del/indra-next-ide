@@ -12,6 +12,7 @@ interface EditorAreaProps {
   recentFiles?: { id: string; name: string }[]
   onFileSelect?: (id: string) => void
   onCreateFile?: (name: string) => void
+  onCursorChange?: (line: number, col: number, tabSize: number) => void
 }
 
 const RECENT_KEY = 'indranext-recent-files'
@@ -68,7 +69,7 @@ const editorOptions = {
   contextmenu: true,
 } as const
 
-function EditorArea({ activeTab, content, onChange, isDark = true, recentFiles = [], onFileSelect, onCreateFile }: EditorAreaProps) {
+function EditorArea({ activeTab, content, onChange, isDark = true, recentFiles = [], onFileSelect, onCreateFile, onCursorChange }: EditorAreaProps) {
   const [showTemplates, setShowTemplates] = useState(false)
   const editorRef = useRef<Parameters<OnMount>[0] | null>(null)
   const monacoRef = useRef<typeof import('monaco-editor') | null>(null)
@@ -145,8 +146,6 @@ function EditorArea({ activeTab, content, onChange, isDark = true, recentFiles =
     })
   }, [])
 
-  const templates = ['index.html', 'style.css', 'app.js', 'App.tsx', 'data.json']
-
   const handleTemplateCreate = (name: string) => {
     onCreateFile?.(name)
     setShowTemplates(false)
@@ -175,55 +174,105 @@ function EditorArea({ activeTab, content, onChange, isDark = true, recentFiles =
     const disposable = (monaco as unknown as { editor: { onDidChangeMarkers: (cb: () => void) => { dispose: () => void } } }).editor.onDidChangeMarkers(updateMarkerProblems)
     setTimeout(updateMarkerProblems, 500)
 
-    return () => disposable.dispose()
-  }, [])
+    const cursorDisposable = editor.onDidChangeCursorPosition((e) => {
+      const model = editor.getModel()
+      const tabSize = model?.getOptions().tabSize ?? 2
+      onCursorChange?.(e.position.lineNumber, e.position.column, tabSize)
+    })
+
+    onCursorChange?.(
+      editor.getPosition()?.lineNumber ?? 1,
+      editor.getPosition()?.column ?? 1,
+      editor.getModel()?.getOptions().tabSize ?? 2,
+    )
+
+    return () => { disposable.dispose(); cursorDisposable.dispose() }
+  }, [onCursorChange])
 
   const themeName = isDark ? 'indra-dark' : 'indra-light'
 
   if (!activeTab) {
     return (
       <div className="flex flex-1 items-center justify-center overflow-auto" style={{ backgroundColor: 'var(--bg-app)' }}>
-        <div className="max-w-lg w-full px-8 py-12">
-          <div className="text-center mb-10 animate-fade-in-up">
-            <div className="inline-flex items-center justify-center size-16 rounded-2xl mb-4"
+        <div className="max-w-2xl w-full px-8 py-8">
+          <div className="text-center mb-8 animate-fade-in-up">
+            <div className="inline-flex items-center justify-center size-16 rounded-2xl mb-3 animate-pulse-glow"
                  style={{ backgroundColor: 'rgba(0,122,204,0.15)' }}>
               <svg width="36" height="36" viewBox="0 0 16 16" fill="#007acc">
                 <path d="M9.5 3.5L7 8l2.5 4.5H11L8.5 8 11 3.5H9.5zM5 3.5L2.5 8 5 12.5H6.5L4 8l2.5-4.5H5z" />
               </svg>
             </div>
-            <h2 className="text-lg font-semibold mb-2" style={{ color: 'var(--text-primary)' }}>Welcome to IndraNext IDE</h2>
-            <p className="text-sm" style={{ color: 'var(--text-dim)' }}>Open a file or create a new one to start coding</p>
+            <h2 className="text-xl font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>Welcome to IndraNext IDE</h2>
+            <p className="text-xs" style={{ color: 'var(--text-dim)' }}>
+              Developed by Ayush Kumar &middot; &copy; 2026 IndraNext Technologies
+            </p>
           </div>
 
-          <div className="grid gap-3 mb-8 animate-fade-in-up stagger-3">
-            <div className="p-4 rounded-lg border" style={{ backgroundColor: 'var(--bg-sidebar)', borderColor: 'var(--border)' }}>
-              <h3 className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--text-muted)' }}>Quick Start</h3>
-              <div className="flex flex-wrap gap-2">
-                {templates.map((t) => (
-                  <button key={t} onClick={() => handleTemplateCreate(t)}
-                    className="px-3 py-1.5 rounded text-xs transition-all duration-200 hover:scale-105"
-                    style={{ backgroundColor: 'var(--bg-input)', color: 'var(--text-primary)', border: '1px solid var(--border)' }}>
-                    + {t}
+          <div className="flex gap-3 mb-6 animate-fade-in-up stagger-2">
+            {[
+              { icon: 'M8 2v12M2 8h12', label: 'New File', action: () => { const name = prompt('File name:'); if (name) handleTemplateCreate(name) }, color: '#4ec9b0' },
+              { icon: 'M11.742 10.344a6.5 6.5 0 10-1.397 1.398l3.85 3.85a1 1 0 001.415-1.414l-3.868-3.834zm-5.242.156a5 5 0 110-10 5 5 0 010 10z', label: 'Open File', action: () => { /* Ctrl+P already handles this */ }, color: '#569cd6' },
+              { icon: 'M4 2.5v11l9-5.5L4 2.5z', label: 'Run Preview', action: onFileSelect ? () => { if (recentFiles.length > 0) onFileSelect(recentFiles[0].id) } : undefined, color: '#dcdcaa' },
+              { icon: 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z', label: 'AI Chat', action: () => { const btn = document.querySelector('[title="AI Chat"]') as HTMLButtonElement; btn?.click() }, color: '#007acc' },
+            ].map(card => (
+              <button key={card.label} onClick={card.action}
+                className="flex-1 flex flex-col items-center gap-2 p-4 rounded-xl border transition-all duration-200 hover:scale-[1.03] hover:shadow-lg"
+                style={{ backgroundColor: 'var(--bg-sidebar)', borderColor: 'var(--border)' }}>
+                <div className="size-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: `${card.color}20` }}>
+                  <svg width="20" height="20" viewBox="0 0 16 16" fill={card.color}>
+                    <path d={card.icon} stroke={card.icon.includes('stroke') ? card.color : undefined} strokeWidth={card.icon.includes('stroke') ? '1.5' : undefined} />
+                  </svg>
+                </div>
+                <span className="text-xs font-medium" style={{ color: 'var(--text-primary)' }}>{card.label}</span>
+              </button>
+            ))}
+          </div>
+
+          <div className="grid gap-3 mb-6 animate-fade-in-up stagger-3">
+            <div className="p-4 rounded-xl border" style={{ backgroundColor: 'var(--bg-sidebar)', borderColor: 'var(--border)' }}>
+              <h3 className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--text-muted)' }}>Quick Start Templates</h3>
+              <div className="flex flex-wrap gap-2 mb-2">
+                {[
+                  { name: 'index.html', icon: 'M1 2.5A1.5 1.5 0 012.5 1h3.207a1.5 1.5 0 011.06.44l3.754 3.753a1.5 1.5 0 01.44 1.06V13.5a1.5 1.5 0 01-1.5 1.5h-7A1.5 1.5 0 011 13.5V2.5z', color: '#e44d26' },
+                  { name: 'style.css', icon: 'M1 2.5A1.5 1.5 0 012.5 1h3.207a1.5 1.5 0 011.06.44l3.754 3.753a1.5 1.5 0 01.44 1.06V13.5a1.5 1.5 0 01-1.5 1.5h-7A1.5 1.5 0 011 13.5V2.5z', color: '#264de4' },
+                  { name: 'app.js', icon: 'M1 2.5A1.5 1.5 0 012.5 1h3.207a1.5 1.5 0 011.06.44l3.754 3.753a1.5 1.5 0 01.44 1.06V13.5a1.5 1.5 0 01-1.5 1.5h-7A1.5 1.5 0 011 13.5V2.5z', color: '#f7df1e' },
+                  { name: 'App.tsx', icon: 'M1 2.5A1.5 1.5 0 012.5 1h3.207a1.5 1.5 0 011.06.44l3.754 3.753a1.5 1.5 0 01.44 1.06V13.5a1.5 1.5 0 01-1.5 1.5h-7A1.5 1.5 0 011 13.5V2.5z', color: '#3178c6' },
+                  { name: 'data.json', icon: 'M1 2.5A1.5 1.5 0 012.5 1h3.207a1.5 1.5 0 011.06.44l3.754 3.753a1.5 1.5 0 01.44 1.06V13.5a1.5 1.5 0 01-1.5 1.5h-7A1.5 1.5 0 011 13.5V2.5z', color: '#292929' },
+                ].map(t => (
+                  <button key={t.name} onClick={() => handleTemplateCreate(t.name)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs transition-all duration-200 hover:scale-105"
+                    style={{ backgroundColor: `${t.color}18`, color: 'var(--text-primary)', border: '1px solid var(--border)' }}>
+                    <svg width="12" height="12" viewBox="0 0 16 16" fill={t.color}><path d={t.icon} /></svg>
+                    {t.name}
                   </button>
                 ))}
                 <button onClick={() => setShowTemplates(!showTemplates)}
-                  className="px-3 py-1.5 rounded text-xs" style={{ color: 'var(--text-dim)' }}>
+                  className="px-3 py-1.5 rounded-lg text-xs" style={{ color: 'var(--text-dim)' }}>
                   More...
                 </button>
               </div>
+              {showTemplates && (
+                <div className="flex flex-wrap gap-2 pt-2 border-t" style={{ borderColor: 'var(--border)' }}>
+                  {['server.py', 'main.go', 'config.yaml', 'README.md', 'app.py', 'server.js', 'component.tsx'].map(t => (
+                    <button key={t} onClick={() => handleTemplateCreate(t)}
+                      className="px-2.5 py-1 rounded text-xs hover:bg-[var(--bg-hover)] transition-colors"
+                      style={{ color: 'var(--text-dim)', border: '1px solid var(--border)' }}>
+                      + {t}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
             {recentFiles.length > 0 && (
-              <div className="p-4 rounded-lg border" style={{ backgroundColor: 'var(--bg-sidebar)', borderColor: 'var(--border)' }}>
+              <div className="p-4 rounded-xl border" style={{ backgroundColor: 'var(--bg-sidebar)', borderColor: 'var(--border)' }}>
                 <h3 className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--text-muted)' }}>Recent Files</h3>
                 <div className="space-y-1">
-                  {recentFiles.slice(0, 5).map((f) => (
+                  {recentFiles.slice(0, 6).map((f) => (
                     <button key={f.id} onClick={() => onFileSelect?.(f.id)}
-                      className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs transition-colors hover:bg-[var(--bg-hover)]"
+                      className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-xs transition-colors hover:bg-[var(--bg-hover)]"
                       style={{ color: 'var(--text-primary)' }}>
-                      <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor" className="shrink-0 text-[#519aba]">
-                        <path d="M1 2.5A1.5 1.5 0 012.5 1h3.207a1.5 1.5 0 011.06.44l3.754 3.753a1.5 1.5 0 01.44 1.06V13.5a1.5 1.5 0 01-1.5 1.5h-7A1.5 1.5 0 011 13.5V2.5z" />
-                      </svg>
+                      <svg width="14" height="14" viewBox="0 0 16 16" fill="#519aba"><path d="M1 2.5A1.5 1.5 0 012.5 1h3.207a1.5 1.5 0 011.06.44l3.754 3.753a1.5 1.5 0 01.44 1.06V13.5a1.5 1.5 0 01-1.5 1.5h-7A1.5 1.5 0 011 13.5V2.5z" /></svg>
                       <span className="truncate">{f.name}</span>
                     </button>
                   ))}
@@ -231,27 +280,37 @@ function EditorArea({ activeTab, content, onChange, isDark = true, recentFiles =
               </div>
             )}
 
-            <div className="p-4 rounded-lg border" style={{ backgroundColor: 'var(--bg-sidebar)', borderColor: 'var(--border)' }}>
+            <div className="p-4 rounded-xl border" style={{ backgroundColor: 'var(--bg-sidebar)', borderColor: 'var(--border)' }}>
               <h3 className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--text-muted)' }}>Keyboard Shortcuts</h3>
-              <div className="grid grid-cols-2 gap-2 text-xs" style={{ color: 'var(--text-dim)' }}>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs" style={{ color: 'var(--text-dim)' }}>
                 {[
                   { keys: 'Ctrl+P', desc: 'Quick Open' },
                   { keys: 'Ctrl+Shift+P', desc: 'Command Palette' },
-                  { keys: 'Ctrl+S', desc: 'Save' },
+                  { keys: 'Ctrl+S', desc: 'Save File' },
                   { keys: 'Ctrl+`', desc: 'Toggle Terminal' },
+                  { keys: 'Ctrl+B', desc: 'Toggle Sidebar' },
                   { keys: 'Ctrl+Shift+F', desc: 'Search' },
-                  { keys: 'Alt+Click', desc: 'Multi Cursor' },
+                  { keys: 'Ctrl+Shift+`', desc: 'New Terminal' },
+                  { keys: 'Ctrl+K Z', desc: 'Zen Mode' },
                 ].map(s => (
                   <div key={s.keys} className="flex items-center gap-2">
-                    <kbd className="px-1.5 py-0.5 rounded text-[10px] font-medium"
+                    <kbd className="px-1.5 py-0.5 rounded text-[10px] font-medium whitespace-nowrap"
                          style={{ backgroundColor: 'var(--bg-input)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}>
                       {s.keys}
                     </kbd>
-                    <span>{s.desc}</span>
+                    <span className="truncate">{s.desc}</span>
                   </div>
                 ))}
               </div>
             </div>
+          </div>
+
+          <div className="text-center text-[10px] animate-fade-in" style={{ color: 'var(--text-dim)' }}>
+            <a href="https://indranextechnologies.in/" target="_blank" rel="noopener noreferrer"
+              className="hover:underline transition-opacity">
+              IndraNext Technologies
+            </a>
+            &nbsp;&middot; <a href="mailto:info@indranextechnologies.in" className="hover:underline">info@indranextechnologies.in</a>
           </div>
         </div>
       </div>

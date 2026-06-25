@@ -45,11 +45,18 @@ export function useAuth() {
     if (error) setError(error.message)
   }, [])
 
+  const signInWithOAuth = useCallback(async (provider: 'github' | 'google') => {
+    setError(null)
+    setMessage(null)
+    const { error } = await supabase.auth.signInWithOAuth({ provider })
+    if (error) setError(error.message)
+  }, [])
+
   const signOut = useCallback(async () => {
     setError(null)
     setMessage(null)
     await supabase.auth.signOut()
   }, [])
 
-  return { session, user, loading, error, message, signUp, signIn, signOut, setError }
+  return { session, user, loading, error, message, signUp, signIn, signInWithOAuth, signOut, setError }
 }
