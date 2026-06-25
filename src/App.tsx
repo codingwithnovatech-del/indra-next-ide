@@ -29,6 +29,7 @@ import type { FileNode } from './types'
 import GuidePage from './components/GuidePage'
 import MobileBottomNav from './components/MobileBottomNav'
 import NotificationToast, { showToast } from './components/NotificationToast'
+import TurnstileChallenge from './components/TurnstileChallenge'
 
 type Screen = 'loading' | 'login' | 'dashboard' | 'ide' | 'guide'
 
@@ -187,6 +188,12 @@ function App() {
   const [splitFileId, setSplitFileId] = useState<string | null>(null)
   const [cursor, setCursor] = useState<{ line: number; col: number; tabSize: number }>({ line: 1, col: 1, tabSize: 2 })
   const [previewRefreshKey, setPreviewRefreshKey] = useState(0)
+  const [turnstilePassed, setTurnstilePassed] = useState(() => sessionStorage.getItem('cf-turnstile') === '1')
+
+  const handleTurnstileSuccess = useCallback(() => {
+    sessionStorage.setItem('cf-turnstile', '1')
+    setTurnstilePassed(true)
+  }, [])
 
   const isMobile = useMediaQuery('(max-width: 767px)')
   const paletteOpenRef = useRef(paletteOpen)
@@ -386,6 +393,10 @@ function App() {
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [toggleTerminal, toggleZenMode])
+
+  if (!turnstilePassed) {
+    return <TurnstileChallenge onSuccess={handleTurnstileSuccess} />
+  }
 
   if (screen === 'login') {
     return (
