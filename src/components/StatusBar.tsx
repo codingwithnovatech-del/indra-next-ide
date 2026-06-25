@@ -10,12 +10,13 @@ interface StatusBarProps {
   col?: number
   tabSize?: number
   isDirty?: boolean
+  folderName?: string
   children?: React.ReactNode
 }
 
 const themeLabel: Record<ThemeMode, string> = { dark: 'Dark', light: 'Light', auto: 'Auto' }
 
-function StatusBar({ themeMode, onThemeToggle, line, col, tabSize, isDirty, children }: StatusBarProps) {
+function StatusBar({ themeMode, onThemeToggle, line, col, tabSize, isDirty, folderName, children }: StatusBarProps) {
   return (
     <footer className="flex h-[24px] shrink-0 items-center px-3 text-xs text-white select-none"
             style={{ backgroundColor: 'var(--bg-statusbar)' }}>
@@ -24,6 +25,14 @@ function StatusBar({ themeMode, onThemeToggle, line, col, tabSize, isDirty, chil
           <path d="M9.5 3.5L7 8l2.5 4.5H11L8.5 8 11 3.5H9.5zM5 3.5L2.5 8 5 12.5H6.5L4 8l2.5-4.5H5z" />
         </svg>
         <span className="max-md:hidden">IndraNext</span>
+        {folderName && (
+          <span className="flex items-center gap-1 text-[10px] max-md:hidden" style={{ color: 'rgba(255,255,255,0.8)' }}>
+            <svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor">
+              <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />
+            </svg>
+            {folderName}
+          </span>
+        )}
         {children}
       </span>
       <span className="ml-auto flex items-center gap-3">

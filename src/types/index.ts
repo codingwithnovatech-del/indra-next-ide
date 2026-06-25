@@ -4,6 +4,12 @@ export interface FileNode {
   type: 'file' | 'folder'
   content?: string
   children?: FileNode[]
+  path?: string
+}
+
+export interface RecentProject {
+  name: string
+  lastOpened: number
 }
 
 export interface TabItem {

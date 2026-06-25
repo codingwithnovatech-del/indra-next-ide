@@ -1,5 +1,6 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react'
 import { useFileSystem } from './hooks/useFileSystem'
+import { useFileSystemAccess } from './hooks/useFileSystemAccess'
 import { useMediaQuery } from './hooks/useMediaQuery'
 import { useTheme } from './hooks/useTheme'
 import { useAuth } from './hooks/useAuth'
@@ -27,6 +28,7 @@ import ProblemsPanel from './components/ProblemsPanel'
 import type { FileNode } from './types'
 import GuidePage from './components/GuidePage'
 import MobileBottomNav from './components/MobileBottomNav'
+import NotificationToast, { showToast } from './components/NotificationToast'
 
 type Screen = 'loading' | 'login' | 'dashboard' | 'ide' | 'guide'
 
@@ -50,6 +52,8 @@ function App() {
   const { session, user, error: authError, message: authMessage, signUp, signIn, signInWithOAuth, signOut, setError: setAuthError } = useAuth()
   const { mode: themeMode, toggleTheme, setMode, isDark } = useTheme()
   const { settings, updateSettings } = useSettings()
+  const fsa = useFileSystemAccess()
+  const idToPathRef = useRef<Map<string, string>>(new Map())
 
   const [screen, setScreen] = useState<Screen>('ide')
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(null)
@@ -105,11 +109,42 @@ function App() {
     isDirty: isFileDirty,
   } = useFileSystem(currentProjectId ?? 'default')
 
-  const handleSave = useCallback(() => {
-    if (activeFileId) {
-      saveFile(activeFileId)
+  const handleSave = useCallback(async () => {
+    if (!activeFileId) return
+    const node = flat.get(activeFileId)
+    if (node && node.path && fsa.isActive && fsa.writeFile) {
+      try {
+        await fsa.writeFile(node.path, node.content || '')
+        saveFile(activeFileId)
+        showToast('Saved to disk', 'success')
+      } catch (err) {
+        showToast(err instanceof Error ? err.message : 'Failed to save file', 'error')
+      }
+      return
     }
-  }, [activeFileId, saveFile])
+    saveFile(activeFileId)
+  }, [activeFileId, saveFile, flat, fsa])
+
+  const handleOpenFolder = useCallback(async () => {
+    try {
+      const result = await fsa.openFolder()
+      if (result) {
+        idToPathRef.current = result.idToPath
+        replaceRoot(result.root, [], null)
+        showToast(`Opened folder: ${fsa.folderName || 'Unknown'}`, 'success')
+      }
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Failed to open folder', 'error')
+    }
+  }, [fsa, replaceRoot])
+
+  const handleCloseFolder = useCallback(() => {
+    fsa.closeFolder()
+    idToPathRef.current = new Map()
+    const emptyRoot: FileNode = { id: '__root__', name: 'workspace', type: 'folder', children: [] }
+    replaceRoot(emptyRoot, [], null)
+    showToast('Folder closed', 'info')
+  }, [fsa, replaceRoot])
 
   const cloudLoadedRef = useRef<string | null>(null)
   useEffect(() => {
@@ -224,14 +259,51 @@ function App() {
   )
 
   const handleCreateItem = useCallback(
-    (parentId: string, type: 'file' | 'folder', name: string) => createItem(parentId, type, name),
-    [createItem],
+    (parentId: string, type: 'file' | 'folder', name: string) => {
+      const id = createItem(parentId, type, name)
+      if (fsa.isActive && id) {
+        const parentPath = idToPathRef.current.get(parentId) || ''
+        const relativePath = parentPath ? `${parentPath}/${name}` : name
+        idToPathRef.current.set(id, relativePath)
+        if (type === 'file') {
+          fsa.createFile(relativePath).catch((err: Error) => showToast(err.message, 'error'))
+        } else {
+          fsa.createDirectory(relativePath).catch((err: Error) => showToast(err.message, 'error'))
+        }
+      }
+      return id
+    },
+    [createItem, fsa],
   )
 
   const handlePaletteCreateFile = useCallback((name: string) => {
     const id = createItem(vfsRoot.id, 'file', name)
     if (id) openFile(id)
   }, [createItem, openFile, vfsRoot.id])
+
+  const handleDeleteItem = useCallback((id: string) => {
+    if (fsa.isActive) {
+      const path = idToPathRef.current.get(id)
+      if (path) {
+        fsa.deleteEntry(path).catch((err: Error) => showToast(err.message, 'error'))
+      }
+    }
+    deleteItem(id)
+  }, [deleteItem, fsa])
+
+  const handleRenameItem = useCallback((id: string, name: string) => {
+    if (fsa.isActive) {
+      const oldPath = idToPathRef.current.get(id)
+      if (oldPath) {
+        const parts = oldPath.split('/')
+        parts[parts.length - 1] = name
+        const newPath = parts.join('/')
+        idToPathRef.current.set(id, newPath)
+        fsa.renameEntry(oldPath, newPath).catch((err: Error) => showToast(err.message, 'error'))
+      }
+    }
+    renameItem(id, name)
+  }, [renameItem, fsa])
 
   const handleClosePreview = useCallback(() => setPreviewOpen(false), [])
   const handleToggleAutoRefresh = useCallback(() => setAutoRefresh((p) => !p), [])
@@ -398,8 +470,8 @@ function App() {
             activeFileId={activeFileId}
             onFileClick={handleFileClick}
             onCreateItem={handleCreateItem}
-            onRename={renameItem}
-            onDelete={deleteItem}
+            onRename={handleRenameItem}
+            onDelete={handleDeleteItem}
             isOpen={sidebarOpen}
             view={sidebarView}
             renamingId={renamingId}
@@ -409,6 +481,11 @@ function App() {
             settings={settings}
             onSettingsChange={updateSettings}
             onOpenGuide={handleOpenGuide}
+            onOpenFolder={handleOpenFolder}
+            onCloseFolder={handleCloseFolder}
+            fsSupported={fsa.isSupported}
+            fsActive={fsa.isActive}
+            folderName={fsa.folderName}
             onContextMenu={(e, fileId) => {
               e.preventDefault()
               const node = flat.get(fileId)
@@ -416,7 +493,7 @@ function App() {
                 { id: 'open', label: 'Open', action: () => openFile(fileId) },
                 ...(node?.type === 'file' ? [{ id: 'split', label: 'Split Right', action: () => handleSplitEditor(fileId) }] : []),
                 { id: 'rename', label: 'Rename', action: () => setRenamingId(fileId) },
-                { id: 'delete', label: 'Delete', action: () => deleteItem(fileId) },
+                { id: 'delete', label: 'Delete', action: () => handleDeleteItem(fileId) },
                 { id: 'div1', label: '', divider: true, action: () => {} },
                 { id: 'new-file', label: 'New File', action: () => handleCreateItem(fileId, 'file', 'new-file.ts') },
                 { id: 'new-folder', label: 'New Folder', action: () => handleCreateItem(fileId, 'folder', 'new-folder') },
@@ -460,6 +537,11 @@ function App() {
               onCursorChange={(line, col, tabSize) => setCursor({ line, col, tabSize })}
               onSave={handleSave}
               onMonacoCommand={handleMonacoCommand}
+              onOpenFolder={handleOpenFolder}
+              fsSupported={fsa.isSupported}
+              fsActive={fsa.isActive}
+              folderName={fsa.folderName}
+              recentProjects={fsa.getRecentProjects()}
             />
 
             {!zenMode && !isMobile && splitFileId && (
@@ -486,6 +568,11 @@ function App() {
                   onCursorChange={(line, col, tabSize) => setCursor({ line, col, tabSize })}
                   onSave={handleSave}
                   onMonacoCommand={handleMonacoCommand}
+                  onOpenFolder={handleOpenFolder}
+                  fsSupported={fsa.isSupported}
+                  fsActive={fsa.isActive}
+                  folderName={fsa.folderName}
+                  recentProjects={fsa.getRecentProjects()}
                 />
               </div>
             )}
@@ -599,6 +686,7 @@ function App() {
           col={cursor.col}
           tabSize={cursor.tabSize}
           isDirty={activeFileId ? isFileDirty(activeFileId) : undefined}
+          folderName={fsa.isActive ? fsa.folderName : undefined}
         >
           {session ? (
             <span className="flex items-center gap-1 text-[#4ec9b0] ml-2 text-[10px]">● Cloud Sync</span>
@@ -630,6 +718,8 @@ function App() {
           </button>
         </StatusBar>
       )}
+
+      <NotificationToast />
 
       <CommandPalette
         isOpen={paletteOpen}

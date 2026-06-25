@@ -28,6 +28,11 @@ interface SidebarProps {
   onSettingsChange?: (settings: Settings) => void
   onContextMenu?: (e: React.MouseEvent, fileId: string) => void
   onOpenGuide?: () => void
+  onOpenFolder?: () => void
+  onCloseFolder?: () => void
+  fsSupported?: boolean
+  fsActive?: boolean
+  folderName?: string
 }
 
 function Sidebar({
@@ -47,6 +52,11 @@ function Sidebar({
   onSettingsChange,
   onContextMenu,
   onOpenGuide,
+  onOpenFolder,
+  onCloseFolder,
+  fsSupported,
+  fsActive,
+  folderName,
 }: SidebarProps) {
   const handleCreateChild = useCallback(
     (parentId: string, type: 'file' | 'folder') => {
@@ -77,8 +87,33 @@ function Sidebar({
         <>
           <div className="flex items-center justify-between px-3 h-[30px] text-[11px] font-semibold uppercase tracking-wider select-none"
                style={{ color: 'var(--text-muted)' }}>
-            <span>Explorer</span>
+            <span className="flex items-center gap-1.5">
+              <span>{fsActive && folderName ? folderName : 'Explorer'}</span>
+              {fsActive && (
+                <span className="text-[8px] px-1 py-0.5 rounded" style={{ backgroundColor: 'rgba(197,134,192,0.2)', color: '#c586c0' }}>FS</span>
+              )}
+            </span>
             <span className="flex items-center gap-0.5">
+              {fsSupported && !fsActive && (
+                <button onClick={onOpenFolder}
+                  className="flex size-5 items-center justify-center rounded hover:bg-[var(--bg-hover)] hover:text-white transition-colors"
+                  style={{ color: 'var(--text-dim)' }}
+                  title="Open Folder">
+                  <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
+                    <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />
+                  </svg>
+                </button>
+              )}
+              {fsActive && (
+                <button onClick={onCloseFolder}
+                  className="flex size-5 items-center justify-center rounded hover:bg-[var(--bg-hover)] hover:text-white transition-colors"
+                  style={{ color: 'var(--text-dim)' }}
+                  title="Close Folder">
+                  <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
+                    <path d="M2 2v12h4V2H2zm1 1h2v3H3V3zm0 4h2v7H3V7zm5-5v12h4V2H8zm1 1h2v7H9V3zm0 8h2v3H9v-3z" />
+                  </svg>
+                </button>
+              )}
               <button
                 onClick={() => handleCreateChild(root.id, 'file')}
                 className="flex size-5 items-center justify-center rounded hover:bg-[var(--bg-hover)] hover:text-white transition-colors"

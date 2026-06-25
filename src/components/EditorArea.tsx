@@ -4,6 +4,8 @@ import type { TabItem } from '../types'
 import { emmetHTML, emmetCSS, emmetJSX } from 'emmet-monaco-es'
 import { updateProblems } from './ProblemsPanel'
 
+import type { RecentProject } from '../types'
+
 interface EditorAreaProps {
   activeTab: TabItem | undefined
   content: string
@@ -16,6 +18,11 @@ interface EditorAreaProps {
   onCursorChange?: (line: number, col: number, tabSize: number) => void
   onSave?: () => void
   onMonacoCommand?: (cmd: string) => void
+  onOpenFolder?: () => void
+  fsSupported?: boolean
+  fsActive?: boolean
+  folderName?: string
+  recentProjects?: RecentProject[]
 }
 
 const RECENT_KEY = 'indranext-recent-files'
@@ -71,7 +78,7 @@ const baseEditorOptions = {
   contextmenu: true,
 }
 
-function EditorArea({ activeTab, content, onChange, isDark = true, isMobile = false, recentFiles = [], onFileSelect, onCreateFile, onCursorChange, onSave, onMonacoCommand }: EditorAreaProps) {
+function EditorArea({ activeTab, content, onChange, isDark = true, isMobile = false, recentFiles = [], onFileSelect, onCreateFile, onCursorChange, onSave, onMonacoCommand, onOpenFolder, fsSupported, fsActive, folderName, recentProjects = [] }: EditorAreaProps) {
   const [showTemplates, setShowTemplates] = useState(false)
   const editorRef = useRef<Parameters<OnMount>[0] | null>(null)
   const monacoRef = useRef<typeof import('monaco-editor') | null>(null)
@@ -247,7 +254,10 @@ function EditorArea({ activeTab, content, onChange, isDark = true, isMobile = fa
               { icon: 'M11.742 10.344a6.5 6.5 0 10-1.397 1.398l3.85 3.85a1 1 0 001.415-1.414l-3.868-3.834zm-5.242.156a5 5 0 110-10 5 5 0 010 10z', label: 'Open File', action: () => { /* Ctrl+P already handles this */ }, color: '#569cd6' },
               { icon: 'M4 2.5v11l9-5.5L4 2.5z', label: 'Run Preview', action: onFileSelect ? () => { if (recentFiles.length > 0) onFileSelect(recentFiles[0].id) } : undefined, color: '#dcdcaa' },
               { icon: 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z', label: 'AI Chat', action: () => { const btn = document.querySelector('[title="AI Chat"]') as HTMLButtonElement; btn?.click() }, color: '#007acc' },
-            ].map(card => (
+              ...(fsSupported && !fsActive ? [{
+                icon: 'M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z', label: 'Open Folder', action: () => onOpenFolder?.(), color: '#c586c0',
+              }] : []),
+            ].flat().map(card => (
               <button key={card.label} onClick={card.action}
                 className="flex-1 flex flex-col items-center gap-2 p-4 rounded-xl border transition-all duration-200 hover:scale-[1.03] hover:shadow-lg"
                 style={{ backgroundColor: 'var(--bg-sidebar)', borderColor: 'var(--border)' }}>
@@ -296,6 +306,40 @@ function EditorArea({ activeTab, content, onChange, isDark = true, isMobile = fa
                 </div>
               )}
             </div>
+
+            {fsActive && folderName && (
+              <div className="p-4 rounded-xl border" style={{ backgroundColor: 'rgba(197,134,192,0.08)', borderColor: '#c586c0' }}>
+                <div className="flex items-center gap-2 mb-2">
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="#c586c0">
+                    <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />
+                  </svg>
+                  <span className="text-xs font-medium" style={{ color: '#c586c0' }}>Working in: {folderName}</span>
+                </div>
+                <p className="text-[10px]" style={{ color: 'var(--text-dim)' }}>
+                  Files are saved directly to your computer. Open your file manager to see them.
+                </p>
+              </div>
+            )}
+
+            {recentProjects.length > 0 && !fsActive && fsSupported && (
+              <div className="p-4 rounded-xl border" style={{ backgroundColor: 'var(--bg-sidebar)', borderColor: 'var(--border)' }}>
+                <h3 className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--text-muted)' }}>Recent Projects</h3>
+                <div className="space-y-1">
+                  {recentProjects.slice(0, 5).map((p) => (
+                    <div key={p.name} className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-xs"
+                         style={{ color: 'var(--text-primary)' }}>
+                      <svg width="14" height="14" viewBox="0 0 16 16" fill="#c586c0">
+                        <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />
+                      </svg>
+                      <span className="truncate">{p.name}</span>
+                      <span className="ml-auto text-[10px]" style={{ color: 'var(--text-dim)' }}>
+                        {new Date(p.lastOpened).toLocaleDateString()}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {recentFiles.length > 0 && (
               <div className="p-4 rounded-xl border" style={{ backgroundColor: 'var(--bg-sidebar)', borderColor: 'var(--border)' }}>
