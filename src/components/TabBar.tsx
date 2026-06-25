@@ -8,12 +8,15 @@ interface TabBarProps {
   onRun: () => void
   isPreviewOpen: boolean
   onTogglePreview: () => void
+  onReorder?: (fromIdx: number, toIdx: number) => void
 }
 
-function TabBar({ tabs, onSelect, onClose, onRun, isPreviewOpen, onTogglePreview }: TabBarProps) {
+function TabBar({ tabs, onSelect, onClose, onRun, isPreviewOpen, onTogglePreview, onReorder }: TabBarProps) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const [canScrollLeft, setCanScrollLeft] = useState(false)
   const [canScrollRight, setCanScrollRight] = useState(false)
+  const [dragIdx, setDragIdx] = useState<number | null>(null)
+  const [dragOverIdx, setDragOverIdx] = useState<number | null>(null)
 
   const updateScrollState = useCallback(() => {
     const el = scrollRef.current
@@ -36,6 +39,36 @@ function TabBar({ tabs, onSelect, onClose, onRun, isPreviewOpen, onTogglePreview
     scrollRef.current?.scrollBy({ left: amount, behavior: 'smooth' })
   }, [])
 
+  const handleDragStart = useCallback((e: React.DragEvent, idx: number) => {
+    setDragIdx(idx)
+    e.dataTransfer.effectAllowed = 'move'
+    e.dataTransfer.setData('text/plain', String(idx))
+  }, [])
+
+  const handleDragOver = useCallback((e: React.DragEvent, idx: number) => {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+    setDragOverIdx(idx)
+  }, [])
+
+  const handleDragLeave = useCallback(() => {
+    setDragOverIdx(null)
+  }, [])
+
+  const handleDrop = useCallback((e: React.DragEvent, toIdx: number) => {
+    e.preventDefault()
+    if (dragIdx !== null && dragIdx !== toIdx && onReorder) {
+      onReorder(dragIdx, toIdx)
+    }
+    setDragIdx(null)
+    setDragOverIdx(null)
+  }, [dragIdx, onReorder])
+
+  const handleDragEnd = useCallback(() => {
+    setDragIdx(null)
+    setDragOverIdx(null)
+  }, [])
+
   return (
     <div className="flex h-[36px] shrink-0 select-none" style={{ backgroundColor: 'var(--bg-sidebar)' }}>
       {canScrollLeft && (
@@ -46,15 +79,23 @@ function TabBar({ tabs, onSelect, onClose, onRun, isPreviewOpen, onTogglePreview
         </button>
       )}
       <div ref={scrollRef} className="flex flex-1 overflow-x-auto scrollbar-hide">
-        {tabs.map((tab) => (
+        {tabs.map((tab, idx) => (
           <div
             key={tab.id}
+            draggable
             onClick={() => onSelect(tab.id)}
-            className="group relative flex shrink-0 cursor-pointer items-center gap-1.5 border-r px-3 text-sm transition-colors duration-100"
+            onDragStart={(e) => handleDragStart(e, idx)}
+            onDragOver={(e) => handleDragOver(e, idx)}
+            onDragLeave={handleDragLeave}
+            onDrop={(e) => handleDrop(e, idx)}
+            onDragEnd={handleDragEnd}
+            className={`group relative flex shrink-0 cursor-pointer items-center gap-1.5 border-r px-3 text-sm transition-colors duration-100 tab-enter`}
             style={{
               backgroundColor: tab.isActive ? 'var(--bg-tab-active)' : 'var(--bg-tab)',
               color: tab.isActive ? 'var(--text-primary)' : 'var(--text-muted)',
               borderColor: 'var(--border)',
+              opacity: dragIdx === idx ? 0.4 : 1,
+              borderLeft: dragOverIdx === idx && dragIdx !== idx ? '2px solid var(--accent)' : '',
             }}
           >
             {tab.isActive && (

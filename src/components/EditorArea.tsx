@@ -1,7 +1,8 @@
-import { memo, useCallback, useState, useEffect } from 'react'
-import Editor, { type BeforeMount } from '@monaco-editor/react'
+import { memo, useCallback, useState, useEffect, useRef } from 'react'
+import Editor, { type BeforeMount, type OnMount } from '@monaco-editor/react'
 import type { TabItem } from '../types'
 import { emmetHTML, emmetCSS, emmetJSX } from 'emmet-monaco-es'
+import { updateProblems } from './ProblemsPanel'
 
 interface EditorAreaProps {
   activeTab: TabItem | undefined
@@ -69,6 +70,8 @@ const editorOptions = {
 
 function EditorArea({ activeTab, content, onChange, isDark = true, recentFiles = [], onFileSelect, onCreateFile }: EditorAreaProps) {
   const [showTemplates, setShowTemplates] = useState(false)
+  const editorRef = useRef<Parameters<OnMount>[0] | null>(null)
+  const monacoRef = useRef<typeof import('monaco-editor') | null>(null)
 
   useEffect(() => {
     if (activeTab) {
@@ -84,6 +87,28 @@ function EditorArea({ activeTab, content, onChange, isDark = true, recentFiles =
     emmetHTML(monaco)
     emmetCSS(monaco)
     emmetJSX(monaco)
+    try {
+      const snippets = (window as unknown as Record<string, unknown>).__indranext_snippets as Array<{ name: string; prefix: string; body: string; description: string }> | undefined
+      if (snippets && snippets.length > 0) {
+        monaco.languages.registerCompletionItemProvider('*', {
+          provideCompletionItems: (model: { getWordUntilPosition: (pos: { lineNumber: number; column: number }) => { startColumn: number; endColumn: number } }, position: { lineNumber: number; column: number }) => {
+            const word = model.getWordUntilPosition(position)
+            const range = { startLineNumber: position.lineNumber, endLineNumber: position.lineNumber, startColumn: word.startColumn, endColumn: word.endColumn }
+            return {
+              suggestions: snippets.filter(s => s.prefix).map(s => ({
+                label: s.name,
+                kind: monaco.languages.CompletionItemKind.Snippet,
+                insertText: s.body,
+                insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+                documentation: s.description,
+                range,
+              })),
+            }
+          },
+          triggerCharacters: [],
+        })
+      }
+    } catch { /* ignore */ }
     monaco.editor.defineTheme('indra-dark', {
       base: 'vs-dark',
       inherit: true,
@@ -126,6 +151,32 @@ function EditorArea({ activeTab, content, onChange, isDark = true, recentFiles =
     onCreateFile?.(name)
     setShowTemplates(false)
   }
+
+  const handleMount: OnMount = useCallback((editor, monaco) => {
+    editorRef.current = editor
+    monacoRef.current = monaco as unknown as typeof import('monaco-editor')
+
+    const updateMarkerProblems = () => {
+      const model = editor.getModel()
+      if (!model) return
+      const monacoNs = monaco as unknown as { editor: { getModelMarkers: (opts: { resource: unknown }) => Array<{ startLineNumber: number; startColumn: number; message: string; severity: number }>; onDidChangeMarkers: (cb: () => void) => { dispose: () => void } }; MarkerSeverity: { Error: number; Warning: number } }
+      const markers = monacoNs.editor.getModelMarkers({ resource: model.uri })
+      updateProblems(markers.map((m) => ({
+        file: model.uri.path.split('/').pop() || model.uri.toString(),
+        line: m.startLineNumber,
+        column: m.startColumn,
+        message: m.message,
+        severity: m.severity === monacoNs.MarkerSeverity.Error ? 'error' as const
+                : m.severity === monacoNs.MarkerSeverity.Warning ? 'warning' as const
+                : 'info' as const,
+      })))
+    }
+
+    const disposable = (monaco as unknown as { editor: { onDidChangeMarkers: (cb: () => void) => { dispose: () => void } } }).editor.onDidChangeMarkers(updateMarkerProblems)
+    setTimeout(updateMarkerProblems, 500)
+
+    return () => disposable.dispose()
+  }, [])
 
   const themeName = isDark ? 'indra-dark' : 'indra-light'
 
@@ -216,6 +267,7 @@ function EditorArea({ activeTab, content, onChange, isDark = true, recentFiles =
         value={content}
         onChange={onChange}
         beforeMount={handleBeforeMount}
+        onMount={handleMount}
         options={editorOptions}
         loading={
           <div className="flex h-full items-center justify-center" style={{ color: 'var(--text-dim)' }}>

@@ -149,6 +149,15 @@ export function useFileSystem(workspaceId = 'default') {
     setRoot((prev) => renameNode(prev, id, newName))
   }, [])
 
+  const reorderTabs = useCallback((fromIdx: number, toIdx: number) => {
+    setOpenFileIds((prev) => {
+      const next = [...prev]
+      const [moved] = next.splice(fromIdx, 1)
+      next.splice(toIdx, 0, moved)
+      return next
+    })
+  }, [])
+
   const replaceRoot = useCallback((newRoot: FileNode, openIds: string[], active: string | null) => {
     setRoot(newRoot)
     setOpenFileIds(openIds)
@@ -168,6 +177,7 @@ export function useFileSystem(workspaceId = 'default') {
     deleteItem,
     renameItem,
     workspaceId,
+    reorderTabs,
     replaceRoot,
   }
 }

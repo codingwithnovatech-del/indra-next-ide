@@ -2,6 +2,8 @@ import { memo, useCallback } from 'react'
 import { FileTree } from './FileTree'
 import SearchPanel from './SearchPanel'
 import SettingsPanel from './SettingsPanel'
+import GitPanel from './GitPanel'
+import SnippetsPanel from './SnippetsPanel'
 import type { FileNode } from '../types'
 import type { ActivityBarView } from './ActivityBar'
 import type { ThemeMode } from '../hooks/useTheme'
@@ -133,15 +135,7 @@ function Sidebar({
       )}
 
       {view === 'git' && (
-        <div className="flex flex-1 items-center justify-center text-xs" style={{ color: 'var(--text-dim)' }}>
-          <div className="text-center p-4">
-            <svg width="32" height="32" viewBox="0 0 16 16" fill="currentColor" className="mx-auto mb-2 opacity-40">
-              <path d="M2 2v12h4V2H2zm1 1h2v3H3V3zm0 4h2v7H3V7zm5-5v12h4V2H8zm1 1h2v7H9V3zm0 8h2v3H9v-3zm5-5v9h4V6h-4zm1 1h2v7h-2V7zm0 8h2v2h-2v-2z" />
-            </svg>
-            <p className="text-sm font-medium mb-1">Source Control</p>
-            <p className="text-xs opacity-60">Git integration coming soon</p>
-          </div>
-        </div>
+        <GitPanel root={root} />
       )}
 
       {view === 'extensions' && (
@@ -154,6 +148,10 @@ function Sidebar({
             <p className="text-xs opacity-60">Extension marketplace coming soon</p>
           </div>
         </div>
+      )}
+
+      {view === 'snippets' && (
+        <SnippetsPanel visible={true} />
       )}
 
       {view === 'settings' && themeMode && onThemeChange && settings !== undefined && onSettingsChange && (

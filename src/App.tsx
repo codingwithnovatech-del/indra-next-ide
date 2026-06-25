@@ -99,6 +99,7 @@ function App() {
     deleteItem,
     renameItem,
     replaceRoot,
+    reorderTabs,
   } = useFileSystem(currentProjectId ?? 'default')
 
   const cloudLoadedRef = useRef<string | null>(null)
@@ -139,6 +140,7 @@ function App() {
   const [terminalHeight, setTerminalHeight] = useState(200)
   const [problemsOpen, setProblemsOpen] = useState(false)
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; items: ContextMenuItem[] } | null>(null)
+  const [splitFileId, setSplitFileId] = useState<string | null>(null)
 
   const isMobile = useMediaQuery('(max-width: 767px)')
   const paletteOpenRef = useRef(paletteOpen)
@@ -155,6 +157,14 @@ function App() {
     if (autoRefresh) return computePreview()
     return manualPreviewContent
   }, [previewOpen, autoRefresh, computePreview, manualPreviewContent])
+
+  const handleSplitEditor = useCallback((fileId: string) => {
+    setSplitFileId((prev) => prev === fileId ? null : fileId)
+  }, [])
+
+  const handleCloseSplit = useCallback(() => {
+    setSplitFileId(null)
+  }, [])
 
   const handleRun = useCallback(() => {
     setManualPreviewContent(computePreview())
@@ -232,23 +242,6 @@ function App() {
   }, [flat, activeFileId])
 
   const closeContextMenu = useCallback(() => setContextMenu(null), [])
-
-  const onContextMenu = useCallback((e: React.MouseEvent, fileId?: string) => {
-    e.preventDefault()
-    const items: ContextMenuItem[] = []
-    if (fileId) {
-      items.push(
-        { id: 'rename', label: 'Rename', action: () => setRenamingId(fileId) },
-        { id: 'delete', label: 'Delete', action: () => deleteItem(fileId) },
-      )
-      items.push({ id: 'div1', label: '', divider: true, action: () => {} })
-    }
-    items.push(
-      { id: 'new-file', label: 'New File', shortcut: '', action: () => { handleCreateItem(vfsRoot.id, 'file', 'new-file.ts') } },
-      { id: 'new-folder', label: 'New Folder', action: () => { handleCreateItem(vfsRoot.id, 'folder', 'new-folder') } },
-    )
-    setContextMenu({ x: e.clientX, y: e.clientY, items })
-  }, [vfsRoot.id, handleCreateItem, deleteItem])
 
   const commands: Command[] = useMemo(() => [
     { id: 'back', label: 'Go to Dashboard', description: 'Back to project list', category: 'Navigate', action: handleBackToDashboard },
@@ -359,8 +352,10 @@ function App() {
             onSettingsChange={updateSettings}
             onContextMenu={(e, fileId) => {
               e.preventDefault()
+              const node = flat.get(fileId)
               const items: ContextMenuItem[] = [
                 { id: 'open', label: 'Open', action: () => openFile(fileId) },
+                ...(node?.type === 'file' ? [{ id: 'split', label: 'Split Right', action: () => handleSplitEditor(fileId) }] : []),
                 { id: 'rename', label: 'Rename', action: () => setRenamingId(fileId) },
                 { id: 'delete', label: 'Delete', action: () => deleteItem(fileId) },
                 { id: 'div1', label: '', divider: true, action: () => {} },
@@ -385,6 +380,7 @@ function App() {
               onRun={handleRun}
               isPreviewOpen={previewOpen}
               onTogglePreview={handleTogglePreview}
+              onReorder={reorderTabs}
             />
           )}
 
@@ -392,7 +388,7 @@ function App() {
             <Breadcrumbs root={vfsRoot} activeFileId={activeFileId} onNavigate={handleFileClick} />
           )}
 
-          <div className="flex flex-1 overflow-hidden" onContextMenu={(e) => onContextMenu(e)}>
+          <div className="flex flex-1 overflow-hidden">
             <EditorArea
               activeTab={activeTab}
               content={activeTab ? flat.get(activeTab.id)?.content ?? '' : ''}
@@ -403,7 +399,31 @@ function App() {
               onCreateFile={handlePaletteCreateFile}
             />
 
-            {!zenMode && previewOpen && !isMobile && (
+            {!zenMode && splitFileId && (
+              <div className="flex relative border-l" style={{ borderColor: 'var(--border)', width: '50%', minWidth: '200px' }}>
+                <div className="absolute top-1 right-1 z-10 flex gap-1">
+                  <button onClick={handleCloseSplit}
+                    className="size-5 flex items-center justify-center rounded text-[10px] hover:bg-[var(--bg-hover)] transition-colors"
+                    style={{ color: 'var(--text-dim)' }}
+                    title="Close Split">
+                    <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor">
+                      <path d="M2.5 2.5l5 5M7.5 2.5l-5 5" stroke="currentColor" strokeWidth="1.2" />
+                    </svg>
+                  </button>
+                </div>
+                <EditorArea
+                  activeTab={openFiles.find((t) => t.id === splitFileId)}
+                  content={flat.get(splitFileId)?.content ?? ''}
+                  onChange={(value) => { if (value !== undefined) updateContent(splitFileId, value) }}
+                  isDark={isDark}
+                  recentFiles={recentFiles}
+                  onFileSelect={handleFileClick}
+                  onCreateFile={handlePaletteCreateFile}
+                />
+              </div>
+            )}
+
+            {!zenMode && previewOpen && !isMobile && !splitFileId && (
               <div className="w-1/2 min-w-[320px] border-l" style={{ borderColor: 'var(--border)' }}>
                 <LivePreview
                   content={previewContent}
@@ -473,6 +493,7 @@ function App() {
             onRun={handleRun}
             isPreviewOpen={previewOpen}
             onTogglePreview={handleTogglePreview}
+            onReorder={reorderTabs}
           />
         )}
       </div>
