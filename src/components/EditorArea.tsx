@@ -1,4 +1,4 @@
-import { memo, useCallback, useState, useEffect, useRef } from 'react'
+import { memo, useCallback, useState, useEffect, useRef, useMemo } from 'react'
 import Editor, { type BeforeMount, type OnMount } from '@monaco-editor/react'
 import type { TabItem } from '../types'
 import { emmetHTML, emmetCSS, emmetJSX } from 'emmet-monaco-es'
@@ -9,6 +9,7 @@ interface EditorAreaProps {
   content: string
   onChange: (value: string | undefined) => void
   isDark?: boolean
+  isMobile?: boolean
   recentFiles?: { id: string; name: string }[]
   onFileSelect?: (id: string) => void
   onCreateFile?: (name: string) => void
@@ -34,45 +35,50 @@ function getLanguage(filename: string): string {
   return map[ext ?? ''] ?? 'plaintext'
 }
 
-const editorOptions = {
-  minimap: { enabled: true, size: 'proportional', maxColumn: 60, showSlider: 'mouseover' },
+const baseEditorOptions = {
   fontSize: 13,
   fontFamily: "'Cascadia Code', 'Fira Code', 'JetBrains Mono', Consolas, monospace",
   fontLigatures: true,
-  lineNumbers: 'on',
-  wordWrap: 'on',
+  lineNumbers: 'on' as const,
+  wordWrap: 'on' as const,
   automaticLayout: true,
   bracketPairColorization: { enabled: true },
   padding: { top: 12 },
-  renderWhitespace: 'selection',
+  renderWhitespace: 'selection' as const,
   smoothScrolling: true,
-  cursorBlinking: 'smooth',
-  cursorSmoothCaretAnimation: 'on',
-  multiCursorModifier: 'ctrlCmd',
+  cursorBlinking: 'smooth' as const,
+  cursorSmoothCaretAnimation: 'on' as const,
+  multiCursorModifier: 'ctrlCmd' as const,
   multiCursorMergeOverlapping: true,
   folding: true,
   foldingHighlight: true,
-  foldingStrategy: 'indentation',
-  autoClosingBrackets: 'always',
-  autoClosingQuotes: 'always',
+  foldingStrategy: 'indentation' as const,
+  autoClosingBrackets: 'always' as const,
+  autoClosingQuotes: 'always' as const,
   formatOnPaste: true,
   linkedEditing: true,
   codeLens: true,
   colorDecorators: true,
   selectionHighlight: true,
-  occurrenceHighlight: 'singleSel',
-  renderLineHighlight: 'all',
+  occurrenceHighlight: 'singleSel' as const,
+  renderLineHighlight: 'all' as const,
   hideCursorInOverviewRuler: false,
   overviewRulerLanes: 2,
-  inlayHints: { enabled: 'on', fontSize: 11 },
-  find: { addExtraSpaceOnTop: false, autoFindInSelection: 'multiline' },
+  inlayHints: { enabled: 'on' as const, fontSize: 11 },
+  find: { addExtraSpaceOnTop: false, autoFindInSelection: 'multiline' as const },
   contextmenu: true,
-} as const
+}
 
-function EditorArea({ activeTab, content, onChange, isDark = true, recentFiles = [], onFileSelect, onCreateFile, onCursorChange }: EditorAreaProps) {
+function EditorArea({ activeTab, content, onChange, isDark = true, isMobile = false, recentFiles = [], onFileSelect, onCreateFile, onCursorChange }: EditorAreaProps) {
   const [showTemplates, setShowTemplates] = useState(false)
   const editorRef = useRef<Parameters<OnMount>[0] | null>(null)
   const monacoRef = useRef<typeof import('monaco-editor') | null>(null)
+
+  const editorOptions = useMemo(() => ({
+    ...baseEditorOptions,
+    minimap: { enabled: !isMobile, size: 'proportional' as const, maxColumn: 60, showSlider: 'mouseover' as const },
+    fontSize: isMobile ? 11 : 13,
+  }), [isMobile])
 
   useEffect(() => {
     if (activeTab) {

@@ -1,6 +1,10 @@
 import { memo, type ReactNode } from 'react'
 
-function HelpPanel() {
+interface HelpPanelProps {
+  onOpenGuide?: () => void
+}
+
+function HelpPanel({ onOpenGuide }: HelpPanelProps) {
   return (
     <div className="flex flex-1 flex-col overflow-y-auto" style={{ backgroundColor: 'var(--bg-sidebar)' }}>
       <div className="px-3 h-[30px] flex items-center text-[11px] font-semibold uppercase tracking-wider select-none"
@@ -57,7 +61,8 @@ function HelpPanel() {
               { title: 'AI Chat', desc: 'Use AI assistant for coding help', icon: 'M8 1a3 3 0 100 6 3 3 0 000-6zM2 13c0 2 2.5 3 6 3s6-1 6-3c0-2-2.5-3-6-3s-6 1-6 3z' },
               { title: 'Snippets', desc: 'Create and use code snippets', icon: 'M1 2.5A1.5 1.5 0 012.5 1h3.207a1.5 1.5 0 011.06.44l3.754 3.753a1.5 1.5 0 01.44 1.06V13.5a1.5 1.5 0 01-1.5 1.5h-7A1.5 1.5 0 011 13.5V2.5z' },
             ].map(topic => (
-              <div key={topic.title} className="flex items-center gap-3 p-2 rounded-lg transition-colors hover:bg-[var(--bg-hover)] cursor-pointer">
+              <div key={topic.title} onClick={() => onOpenGuide?.()}
+                className="flex items-center gap-3 p-2 rounded-lg transition-colors hover:bg-[var(--bg-hover)] cursor-pointer">
                 <div className="size-8 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: 'var(--bg-input)' }}>
                   <svg width="14" height="14" viewBox="0 0 16 16" fill="#007acc">
                     <path d={topic.icon} />

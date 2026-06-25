@@ -25,8 +25,10 @@ import type { ContextMenuItem } from './components/ContextMenu'
 import TerminalPanel from './components/TerminalPanel'
 import ProblemsPanel from './components/ProblemsPanel'
 import type { FileNode } from './types'
+import GuidePage from './components/GuidePage'
+import MobileBottomNav from './components/MobileBottomNav'
 
-type Screen = 'loading' | 'login' | 'dashboard' | 'ide'
+type Screen = 'loading' | 'login' | 'dashboard' | 'ide' | 'guide'
 
 type BottomPanelTab = 'terminal' | 'problems'
 
@@ -81,6 +83,9 @@ function App() {
     setScreen('ide')
   }, [signOut])
 
+  const handleOpenGuide = useCallback(() => setScreen('guide'), [])
+  const handleCloseGuide = useCallback(() => setScreen('ide'), [])
+
   const isIDE = screen === 'ide'
 
   const {
@@ -96,7 +101,15 @@ function App() {
     renameItem,
     replaceRoot,
     reorderTabs,
+    saveFile,
+    isDirty: isFileDirty,
   } = useFileSystem(currentProjectId ?? 'default')
+
+  const handleSave = useCallback(() => {
+    if (activeFileId) {
+      saveFile(activeFileId)
+    }
+  }, [activeFileId, saveFile])
 
   const cloudLoadedRef = useRef<string | null>(null)
   useEffect(() => {
@@ -180,7 +193,13 @@ function App() {
   }, [computePreview])
 
   const handleSelectTab = useCallback((id: string) => openFile(id), [openFile])
-  const handleCloseTab = useCallback((id: string) => closeFile(id), [closeFile])
+  const handleCloseTab = useCallback((id: string) => {
+    if (isFileDirty(id)) {
+      const result = window.confirm(`"${flat.get(id)?.name ?? id}" has unsaved changes. Do you want to close without saving?`)
+      if (!result) return
+    }
+    closeFile(id)
+  }, [closeFile, isFileDirty, flat])
   const toggleSidebar = useCallback(() => setSidebarOpen((p) => !p), [])
   const closeSidebar = useCallback(() => setSidebarOpen(false), [])
 
@@ -244,6 +263,7 @@ function App() {
 
   const commands: Command[] = useMemo(() => [
     { id: 'back', label: 'Go to Dashboard', description: 'Back to project list', category: 'Navigate', action: handleBackToDashboard },
+    { id: 'guide', label: 'How to Use IndraNext IDE', description: 'Getting started guide', category: 'Help', action: handleOpenGuide },
     { id: 'toggle-preview', label: 'Toggle Preview Panel', category: 'View', action: handleTogglePreview },
     { id: 'run-preview', label: 'Run Preview', category: 'View', action: handleRun },
     { id: 'toggle-sidebar', label: 'Toggle Sidebar', category: 'View', action: toggleSidebar },
@@ -252,11 +272,18 @@ function App() {
     { id: 'theme-dark', label: 'Theme: Dark', category: 'Preferences', action: () => setMode('dark') },
     { id: 'theme-light', label: 'Theme: Light', category: 'Preferences', action: () => setMode('light') },
     { id: 'theme-auto', label: 'Theme: Auto', category: 'Preferences', action: () => setMode('auto') },
-  ], [handleBackToDashboard, handleTogglePreview, handleRun, toggleSidebar, toggleTerminal, toggleZenMode, setMode])
+    { id: 'save', label: 'Save File', description: 'Save current file (Ctrl+S)', category: 'File', action: handleSave },
+  ], [handleBackToDashboard, handleOpenGuide, handleTogglePreview, handleRun, toggleSidebar, toggleTerminal, toggleZenMode, setMode, handleSave])
+
+  const handleSaveRef = useRef(handleSave)
+  handleSaveRef.current = handleSave
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!isIDERef.current) return
+      if ((e.metaKey || e.ctrlKey) && e.key === 's') {
+        e.preventDefault(); handleSaveRef.current?.(); return
+      }
       if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'p') {
         e.preventDefault(); setPaletteMode('commands'); setPaletteOpen(true); return
       }
@@ -310,6 +337,10 @@ function App() {
     )
   }
 
+  if (screen === 'guide') {
+    return <GuidePage onClose={handleCloseGuide} />
+  }
+
   const bottomOpen = terminalOpen || problemsOpen
 
   return (
@@ -352,7 +383,7 @@ function App() {
       {!zenMode && <HamburgerButton isOpen={sidebarOpen} onClick={toggleSidebar} />}
 
       <div className={'flex flex-1 overflow-hidden' + (zenMode ? '' : '')}>
-        {!zenMode && <ActivityBar activeView={sidebarView} onViewChange={handleViewChange} />}
+        {!zenMode && <div className="max-md:hidden"><ActivityBar activeView={sidebarView} onViewChange={handleViewChange} /></div>}
 
         {!zenMode && (
           <Sidebar
@@ -370,6 +401,7 @@ function App() {
             onThemeChange={setMode}
             settings={settings}
             onSettingsChange={updateSettings}
+            onOpenGuide={handleOpenGuide}
             onContextMenu={(e, fileId) => {
               e.preventDefault()
               const node = flat.get(fileId)
@@ -414,13 +446,14 @@ function App() {
               content={activeTab ? flat.get(activeTab.id)?.content ?? '' : ''}
               onChange={handleEditorChange}
               isDark={isDark}
+              isMobile={isMobile}
               recentFiles={recentFiles}
               onFileSelect={handleFileClick}
               onCreateFile={handlePaletteCreateFile}
               onCursorChange={(line, col, tabSize) => setCursor({ line, col, tabSize })}
             />
 
-            {!zenMode && splitFileId && (
+            {!zenMode && !isMobile && splitFileId && (
               <div className="flex relative border-l" style={{ borderColor: 'var(--border)', width: '50%', minWidth: '200px' }}>
                 <div className="absolute top-1 right-1 z-10 flex gap-1">
                   <button onClick={handleCloseSplit}
@@ -437,6 +470,7 @@ function App() {
                   content={flat.get(splitFileId)?.content ?? ''}
                   onChange={(value) => { if (value !== undefined) updateContent(splitFileId, value) }}
                   isDark={isDark}
+                  isMobile={isMobile}
                   recentFiles={recentFiles}
                   onFileSelect={handleFileClick}
                   onCreateFile={handlePaletteCreateFile}
@@ -535,6 +569,15 @@ function App() {
         </div>
       )}
 
+      {!zenMode && isMobile && (
+        <MobileBottomNav
+          activeView={sidebarView}
+          onViewChange={handleViewChange}
+          onRun={handleRun}
+          onToggleTerminal={toggleTerminal}
+        />
+      )}
+
       {!zenMode && (
         <StatusBar
           tabName={activeTab?.name}
@@ -544,6 +587,7 @@ function App() {
           line={cursor.line}
           col={cursor.col}
           tabSize={cursor.tabSize}
+          isDirty={activeFileId ? isFileDirty(activeFileId) : undefined}
         >
           {session ? (
             <span className="flex items-center gap-1 text-[#4ec9b0] ml-2 text-[10px]">● Cloud Sync</span>

@@ -106,9 +106,18 @@ function TabBar({ tabs, onSelect, onClose, onRun, isPreviewOpen, onTogglePreview
               <path d={getFileIcon(tab.name).icon} />
             </svg>
             <span className="truncate max-w-[120px]">{tab.name}</span>
+            {tab.isDirty ? (
+              <span className="ml-1 size-2 shrink-0 rounded-full"
+                    style={{ backgroundColor: 'var(--text-primary)' }}
+                    title="Unsaved changes">
+              </span>
+            ) : null}
             <button
               onClick={(e) => { e.stopPropagation(); onClose(tab.id) }}
-              className="ml-1 flex size-4 items-center justify-center rounded opacity-0 group-hover:opacity-100 transition-opacity duration-100 hover:bg-[var(--bg-hover)]"
+              className="ml-1 flex size-4 items-center justify-center rounded
+                         opacity-0 group-hover:opacity-100
+                         max-md:opacity-100
+                         transition-opacity duration-100 hover:bg-[var(--bg-hover)]"
             >
               <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor">
                 <path d="M2.5 2.5l5 5M7.5 2.5l-5 5" stroke="currentColor" strokeWidth="1.2" />

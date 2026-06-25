@@ -27,6 +27,7 @@ interface SidebarProps {
   settings?: Settings
   onSettingsChange?: (settings: Settings) => void
   onContextMenu?: (e: React.MouseEvent, fileId: string) => void
+  onOpenGuide?: () => void
 }
 
 function Sidebar({
@@ -45,6 +46,7 @@ function Sidebar({
   settings,
   onSettingsChange,
   onContextMenu,
+  onOpenGuide,
 }: SidebarProps) {
   const handleCreateChild = useCallback(
     (parentId: string, type: 'file' | 'folder') => {
@@ -164,7 +166,7 @@ function Sidebar({
           onSettingsChange={onSettingsChange}
         />
       )}
-      {view === 'help' && <HelpPanel />}
+      {view === 'help' && <HelpPanel onOpenGuide={onOpenGuide} />}
       {view === 'ai' && <AIPanel />}
     </aside>
   )

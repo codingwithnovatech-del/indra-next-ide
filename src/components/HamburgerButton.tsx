@@ -9,7 +9,7 @@ function HamburgerButton({ isOpen, onClick }: HamburgerButtonProps) {
   return (
     <button
       onClick={onClick}
-      className="fixed top-2 left-2 z-50 flex size-9 items-center justify-center rounded
+      className="fixed top-2 left-2 z-50 flex size-11 items-center justify-center rounded
                  text-[#cccccc] hover:bg-[#2a2d2e] md:hidden transition-colors"
       aria-label={isOpen ? 'Close sidebar' : 'Open sidebar'}
     >

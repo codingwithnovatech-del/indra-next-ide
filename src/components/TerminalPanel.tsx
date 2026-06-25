@@ -174,6 +174,21 @@ function TerminalPanel({ visible, height, onResize }: TerminalPanelProps) {
           window.addEventListener('mousemove', onMove)
           window.addEventListener('mouseup', onUp)
         }}
+        onTouchStart={(e) => {
+          const startY = e.touches[0].clientY
+          const startHeight = height
+          const onMove = (ev: TouchEvent) => {
+            const delta = startY - ev.touches[0].clientY
+            const newH = Math.max(100, Math.min(500, startHeight + delta))
+            onResize(newH)
+          }
+          const onEnd = () => {
+            window.removeEventListener('touchmove', onMove)
+            window.removeEventListener('touchend', onEnd)
+          }
+          window.addEventListener('touchmove', onMove)
+          window.addEventListener('touchend', onEnd)
+        }}
       />
     </div>
   )

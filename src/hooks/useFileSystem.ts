@@ -69,6 +69,8 @@ export function useFileSystem(workspaceId = 'default') {
     return saved?.activeFileId ?? null
   })
 
+  const [dirtyFiles, setDirtyFiles] = useState<Set<string>>(new Set())
+
   const openFileIdsRef = useRef(openFileIds)
   openFileIdsRef.current = openFileIds
 
@@ -80,8 +82,9 @@ export function useFileSystem(workspaceId = 'default') {
         id,
         name: flat.get(id)?.name ?? 'unknown',
         isActive: id === activeFileId,
+        isDirty: dirtyFiles.has(id),
       })),
-    [openFileIds, activeFileId, flat],
+    [openFileIds, activeFileId, flat, dirtyFiles],
   )
 
   useEffect(() => {
@@ -116,7 +119,18 @@ export function useFileSystem(workspaceId = 'default') {
 
   const updateContent = useCallback((id: string, content: string) => {
     setRoot((prev) => updateNodeContent(prev, id, content))
+    setDirtyFiles((prev) => new Set(prev).add(id))
   }, [])
+
+  const saveFile = useCallback((id: string) => {
+    setDirtyFiles((prev) => {
+      const next = new Set(prev)
+      next.delete(id)
+      return next
+    })
+  }, [])
+
+  const isDirty = useCallback((id: string) => dirtyFiles.has(id), [dirtyFiles])
 
   const createItem = useCallback(
     (parentId: string, type: 'file' | 'folder', name: string): string => {
@@ -179,5 +193,7 @@ export function useFileSystem(workspaceId = 'default') {
     workspaceId,
     reorderTabs,
     replaceRoot,
+    saveFile,
+    isDirty,
   }
 }
